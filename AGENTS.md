@@ -1,16 +1,77 @@
-<!-- BEGIN:nextjs-agent-rules -->
-# This is NOT the Next.js you know
+# AGENTS.md
 
-This version has breaking changes — APIs, conventions, and file structure may all differ from your training data. Read the relevant guide in `node_modules/next/dist/docs/` before writing any code. Heed deprecation notices.
-<!-- END:nextjs-agent-rules -->
+## ShopNova MVP
 
-## ShopNova Conventions
+This repository contains the ShopNova MVP, a university capstone project.
 
-- **No `src/` directory.** All code lives at the project root under `app/`, `components/`, `features/`, `lib/`, `hooks/`, `types/`.
-- **shadcn/ui** components go in `components/ui/`. Custom components go in `components/` or `features/`.
-- **Prisma schema** lives in `prisma/schema.prisma`.
-- **Supabase client** is configured in `lib/supabase.ts`.
-- **React Hook Form + Zod** for all forms. Resolvers via `@hookform/resolvers`.
-- **TanStack Query** for server state. No Redux.
-- **No authentication libraries yet.** Will be added later.
-- **MVP scope only.** Do not build enterprise features.
+The objective is to build a polished, production-quality MVP within approximately 40 development hours.
+
+Always optimize for simplicity, maintainability, and code quality over feature completeness.
+
+---
+
+## Core Rules
+
+- Only implement the task requested in the current prompt.
+- Do not add extra features.
+- Stop immediately after completing the requested milestone.
+- Do not refactor working code unless required for the current task.
+- Reuse existing components whenever possible.
+- Keep the existing project architecture consistent.
+
+---
+
+## Code Quality
+
+- Use strict TypeScript.
+- Write clean, readable, modular code.
+- Prefer reusable components.
+- Avoid duplication.
+- Keep files reasonably small.
+- Remove unused code.
+
+---
+
+## UI
+
+- Use shadcn/ui components where appropriate.
+- Use Tailwind CSS.
+- Keep the UI modern, clean and responsive.
+- Prioritize functionality over visual polish.
+
+---
+
+## Database
+
+- Use Prisma ORM.
+- Use PostgreSQL.
+- Preserve existing relationships unless explicitly instructed otherwise.
+- Do not modify the schema unless the current task requires it.
+
+---
+
+## Dependencies
+
+Do not introduce new packages unless they provide clear value for the requested task.
+
+If a new dependency is required, explain why before using it.
+
+---
+
+## Security
+
+- Never expose secrets.
+- Never commit environment variables.
+- Validate user input.
+- Follow secure defaults.
+
+---
+
+## Before Finishing
+
+Before completing a task:
+
+- Ensure TypeScript remains error free.
+- Keep the codebase consistent.
+- Summarize what changed.
+- Do not continue beyond the requested milestone.
