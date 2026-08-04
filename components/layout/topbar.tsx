@@ -1,6 +1,7 @@
 "use client"
 
-import { Bell, Search, User } from "lucide-react"
+import { Bell, Search } from "lucide-react"
+import { UserButton } from "@clerk/nextjs"
 import { Button } from "@/components/ui/button"
 
 export function Topbar() {
@@ -14,9 +15,7 @@ export function Topbar() {
         <Button variant="ghost" size="icon" aria-label="Notifications">
           <Bell className="h-4 w-4" />
         </Button>
-        <Button variant="ghost" size="icon" aria-label="User menu">
-          <User className="h-4 w-4" />
-        </Button>
+        <UserButton />
       </div>
     </header>
   )
