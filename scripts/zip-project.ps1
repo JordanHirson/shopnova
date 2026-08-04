@@ -9,14 +9,28 @@
 # - .next
 # - .git
 # - .vercel
+# - .turbo
+# - coverage
+# - dist
+# - build
 # - .env*
 # ======================================
 
 $ProjectName = "shopnova"
 
+# Folder where review ZIPs are stored
+$ReviewFolder = "C:\Users\jorda\OneDrive\Documents\Codeeza Project\ShopNova Reviews"
+
+# Create the review folder if it doesn't exist
+if (!(Test-Path $ReviewFolder)) {
+    New-Item -ItemType Directory -Path $ReviewFolder | Out-Null
+}
+
 $Timestamp = Get-Date -Format "yyyy-MM-dd-HHmm"
 
 $ZipName = "$ProjectName-review-$Timestamp.zip"
+
+$ZipPath = Join-Path $ReviewFolder $ZipName
 
 $TempFolder = Join-Path $env:TEMP "$ProjectName-review-temp"
 
@@ -52,25 +66,27 @@ $ExcludeFiles = @(
     ".env.local",
     ".env.development.local",
     ".env.production.local",
-    ".env.test.local"
+    ".env.test.local",
+    "*.zip",
+    "*.7z",
+    "*.tsbuildinfo"
 )
 
-foreach ($file in $ExcludeFiles) {
-    Get-ChildItem $TempFolder -File -Recurse |
-        Where-Object { $_.Name -eq $file } |
+foreach ($pattern in $ExcludeFiles) {
+    Get-ChildItem $TempFolder -File -Recurse -Filter $pattern -ErrorAction SilentlyContinue |
         Remove-Item -Force -ErrorAction SilentlyContinue
 }
 
 # Create ZIP
-Compress-Archive -Path "$TempFolder\*" -DestinationPath $ZipName -Force
+Compress-Archive -Path "$TempFolder\*" -DestinationPath $ZipPath -Force
 
-# Clean temp
+# Clean temp folder
 Remove-Item $TempFolder -Recurse -Force
 
-# Keep only newest 5 review ZIPs
-Get-ChildItem "*.zip" |
+# Keep only the newest 10 review ZIPs
+Get-ChildItem $ReviewFolder -Filter "*.zip" |
     Sort-Object LastWriteTime -Descending |
-    Select-Object -Skip 5 |
+    Select-Object -Skip 10 |
     Remove-Item -Force
 
 Write-Host ""
@@ -78,5 +94,6 @@ Write-Host "======================================"
 Write-Host " Review ZIP created successfully!"
 Write-Host "======================================"
 Write-Host ""
-Write-Host $ZipName
+Write-Host "Location:"
+Write-Host $ZipPath
 Write-Host ""
