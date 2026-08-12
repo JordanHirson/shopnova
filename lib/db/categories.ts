@@ -42,6 +42,19 @@ export async function getCategoryById(id: string) {
 }
 
 /**
+ * Returns a single category by slug for the default store.
+ * Used by the public storefront category page.
+ */
+export async function getCategoryBySlug(slug: string) {
+  const storeId = await getDefaultStoreId()
+  if (!storeId) return null
+
+  return prisma.category.findFirst({
+    where: { slug, storeId },
+  })
+}
+
+/**
  * Creates a new category for the default store.
  */
 export async function createCategory(input: CategoryInput) {

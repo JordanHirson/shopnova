@@ -53,6 +53,80 @@ export async function getProductById(id: string) {
 }
 
 /**
+ * Returns a single product by slug for the default store.
+ * Used by the public storefront.
+ */
+export async function getProductBySlug(slug: string) {
+  const storeId = await getDefaultStoreId()
+  if (!storeId) return null
+
+  return prisma.product.findFirst({
+    where: { slug, storeId },
+    include: {
+      category: { select: { id: true, name: true, slug: true } },
+      images: { orderBy: { sortOrder: "asc" } },
+    },
+  })
+}
+
+/**
+ * Lists all products for the default store, including the first image.
+ * Used by the public storefront product listing page.
+ */
+export async function listStorefrontProducts() {
+  const storeId = await getDefaultStoreId()
+  if (!storeId) return []
+
+  return prisma.product.findMany({
+    where: { storeId },
+    orderBy: { name: "asc" },
+    include: {
+      category: { select: { id: true, name: true, slug: true } },
+      images: { orderBy: { sortOrder: "asc" }, take: 1 },
+    },
+  })
+}
+
+/**
+ * Lists a limited number of products for the storefront home page.
+ */
+export async function listFeaturedProducts(limit = 8) {
+  const storeId = await getDefaultStoreId()
+  if (!storeId) return []
+
+  return prisma.product.findMany({
+    where: { storeId },
+    orderBy: { createdAt: "desc" },
+    take: limit,
+    include: {
+      category: { select: { id: true, name: true, slug: true } },
+      images: { orderBy: { sortOrder: "asc" }, take: 1 },
+    },
+  })
+}
+
+/**
+ * Lists products belonging to a category by category slug.
+ * Used by the public storefront category page.
+ */
+export async function listProductsByCategory(categorySlug: string) {
+  const storeId = await getDefaultStoreId()
+  if (!storeId) return []
+
+  return prisma.product.findMany({
+    where: {
+      storeId,
+      category: { slug: categorySlug },
+    },
+    orderBy: { name: "asc" },
+    include: {
+      category: { select: { id: true, name: true, slug: true } },
+      images: { orderBy: { sortOrder: "asc" }, take: 1 },
+    },
+  })
+}
+
+/**
  * Creates a new product for the default store.
  */
 export async function createProduct(input: ProductInput) {

@@ -19,6 +19,12 @@ export default function MarketingLayout({
             <Link href="/" className="text-muted-foreground transition-colors hover:text-foreground">
               Home
             </Link>
+            <Link href="/products" className="text-muted-foreground transition-colors hover:text-foreground">
+              Products
+            </Link>
+            <Link href="/categories" className="text-muted-foreground transition-colors hover:text-foreground">
+              Categories
+            </Link>
             <Link href="/about" className="text-muted-foreground transition-colors hover:text-foreground">
               About
             </Link>
