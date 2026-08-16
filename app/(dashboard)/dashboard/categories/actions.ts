@@ -7,6 +7,7 @@ import {
   updateCategory,
   deleteCategory,
 } from "@/lib/db"
+import { toUserMessage } from "@/lib/errors"
 
 export type CategoryActionState = {
   error?: string
@@ -34,7 +35,11 @@ export async function createCategoryAction(
     return {}
   } catch (err) {
     return {
-      error: err instanceof Error ? err.message : "Failed to create category.",
+      error: toUserMessage(
+        "createCategoryAction",
+        err,
+        "Failed to create category."
+      ),
     }
   }
 }
@@ -66,7 +71,11 @@ export async function updateCategoryAction(
     return {}
   } catch (err) {
     return {
-      error: err instanceof Error ? err.message : "Failed to update category.",
+      error: toUserMessage(
+        "updateCategoryAction",
+        err,
+        "Failed to update category."
+      ),
     }
   }
 }
@@ -86,7 +95,11 @@ export async function deleteCategoryAction(
     return {}
   } catch (err) {
     return {
-      error: err instanceof Error ? err.message : "Failed to delete category.",
+      error: toUserMessage(
+        "deleteCategoryAction",
+        err,
+        "Failed to delete category."
+      ),
     }
   }
 }

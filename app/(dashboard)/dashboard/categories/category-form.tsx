@@ -69,12 +69,17 @@ export function CategoryForm({ category, onSuccess }: CategoryFormProps) {
   function handleSubmit(formData: FormData) {
     setError(undefined)
     startTransition(async () => {
-      const result = await action({} as CategoryActionState, formData)
-      if (result.error) {
-        setError(result.error)
-      } else {
+      try {
+        const result = await action({} as CategoryActionState, formData)
+        if (result.error) {
+          setError(result.error)
+          return
+        }
         setOpen(false)
         onSuccess?.()
+      } catch (err) {
+        console.error("Category form submission failed:", err)
+        setError("Something went wrong. Please try again.")
       }
     })
   }
@@ -168,11 +173,19 @@ export function DeleteCategoryButton({ category }: { category: Category }) {
   function handleDelete(formData: FormData) {
     setError(undefined)
     startTransition(async () => {
-      const result = await deleteCategoryAction({} as CategoryActionState, formData)
-      if (result.error) {
-        setError(result.error)
-      } else {
+      try {
+        const result = await deleteCategoryAction(
+          {} as CategoryActionState,
+          formData
+        )
+        if (result.error) {
+          setError(result.error)
+          return
+        }
         setOpen(false)
+      } catch (err) {
+        console.error("Category deletion failed:", err)
+        setError("Something went wrong. Please try again.")
       }
     })
   }
