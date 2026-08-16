@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache"
 import { categorySchema } from "@/lib/validations/category"
+import { getCurrentUserId } from "@/lib/auth"
+import { toClientErrorMessage, UNAUTHORIZED_MESSAGE } from "@/lib/errors"
 import {
   createCategory,
   updateCategory,
@@ -16,6 +18,10 @@ export async function createCategoryAction(
   _prevState: CategoryActionState,
   formData: FormData
 ): Promise<CategoryActionState> {
+  if (!(await getCurrentUserId())) {
+    return { error: UNAUTHORIZED_MESSAGE }
+  }
+
   const parsed = categorySchema.safeParse({
     name: formData.get("name"),
     slug: formData.get("slug"),
@@ -33,9 +39,7 @@ export async function createCategoryAction(
     revalidatePath("/dashboard/categories")
     return {}
   } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Failed to create category.",
-    }
+    return { error: toClientErrorMessage(err, "Failed to create category.") }
   }
 }
 
@@ -43,6 +47,10 @@ export async function updateCategoryAction(
   _prevState: CategoryActionState,
   formData: FormData
 ): Promise<CategoryActionState> {
+  if (!(await getCurrentUserId())) {
+    return { error: UNAUTHORIZED_MESSAGE }
+  }
+
   const id = formData.get("id")
   if (typeof id !== "string" || !id) {
     return { error: "Category id is required." }
@@ -65,9 +73,7 @@ export async function updateCategoryAction(
     revalidatePath("/dashboard/categories")
     return {}
   } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Failed to update category.",
-    }
+    return { error: toClientErrorMessage(err, "Failed to update category.") }
   }
 }
 
@@ -75,6 +81,10 @@ export async function deleteCategoryAction(
   _prevState: CategoryActionState,
   formData: FormData
 ): Promise<CategoryActionState> {
+  if (!(await getCurrentUserId())) {
+    return { error: UNAUTHORIZED_MESSAGE }
+  }
+
   const id = formData.get("id")
   if (typeof id !== "string" || !id) {
     return { error: "Category id is required." }
@@ -85,8 +95,6 @@ export async function deleteCategoryAction(
     revalidatePath("/dashboard/categories")
     return {}
   } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Failed to delete category.",
-    }
+    return { error: toClientErrorMessage(err, "Failed to delete category.") }
   }
 }

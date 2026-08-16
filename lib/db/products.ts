@@ -127,6 +127,20 @@ export async function listProductsByCategory(categorySlug: string) {
 }
 
 /**
+ * Throws unless the category belongs to the given store.
+ */
+async function assertCategoryInStore(categoryId: string, storeId: string) {
+  const category = await prisma.category.findFirst({
+    where: { id: categoryId, storeId },
+    select: { id: true },
+  })
+
+  if (!category) {
+    throw new Error("Category not found.")
+  }
+}
+
+/**
  * Creates a new product for the default store.
  */
 export async function createProduct(input: ProductInput) {
@@ -134,6 +148,8 @@ export async function createProduct(input: ProductInput) {
   if (!storeId) {
     throw new Error("No store found. Create a store before adding products.")
   }
+
+  await assertCategoryInStore(input.categoryId, storeId)
 
   return prisma.product.create({
     data: {
@@ -158,8 +174,10 @@ export async function updateProduct(id: string, input: ProductUpdateInput) {
     throw new Error("No store found.")
   }
 
-  return prisma.product.update({
-    where: { id },
+  await assertCategoryInStore(input.categoryId, storeId)
+
+  const { count } = await prisma.product.updateMany({
+    where: { id, storeId },
     data: {
       name: input.name,
       slug: input.slug,
@@ -170,6 +188,10 @@ export async function updateProduct(id: string, input: ProductUpdateInput) {
       categoryId: input.categoryId,
     },
   })
+
+  if (count === 0) {
+    throw new Error("Product not found.")
+  }
 }
 
 /**
@@ -181,7 +203,11 @@ export async function deleteProduct(id: string) {
     throw new Error("No store found.")
   }
 
-  return prisma.product.delete({
-    where: { id },
+  const { count } = await prisma.product.deleteMany({
+    where: { id, storeId },
   })
+
+  if (count === 0) {
+    throw new Error("Product not found.")
+  }
 }
