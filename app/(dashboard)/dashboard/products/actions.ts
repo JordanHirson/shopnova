@@ -2,6 +2,8 @@
 
 import { revalidatePath } from "next/cache"
 import { productSchema } from "@/lib/validations/product"
+import { getCurrentUserId } from "@/lib/auth"
+import { toClientErrorMessage, UNAUTHORIZED_MESSAGE } from "@/lib/errors"
 import {
   createProduct,
   updateProduct,
@@ -16,6 +18,10 @@ export async function createProductAction(
   _prevState: ProductActionState,
   formData: FormData
 ): Promise<ProductActionState> {
+  if (!(await getCurrentUserId())) {
+    return { error: UNAUTHORIZED_MESSAGE }
+  }
+
   const parsed = productSchema.safeParse({
     name: formData.get("name"),
     slug: formData.get("slug"),
@@ -37,9 +43,7 @@ export async function createProductAction(
     revalidatePath("/dashboard/products")
     return {}
   } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Failed to create product.",
-    }
+    return { error: toClientErrorMessage(err, "Failed to create product.") }
   }
 }
 
@@ -47,6 +51,10 @@ export async function updateProductAction(
   _prevState: ProductActionState,
   formData: FormData
 ): Promise<ProductActionState> {
+  if (!(await getCurrentUserId())) {
+    return { error: UNAUTHORIZED_MESSAGE }
+  }
+
   const id = formData.get("id")
   if (typeof id !== "string" || !id) {
     return { error: "Product id is required." }
@@ -73,9 +81,7 @@ export async function updateProductAction(
     revalidatePath("/dashboard/products")
     return {}
   } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Failed to update product.",
-    }
+    return { error: toClientErrorMessage(err, "Failed to update product.") }
   }
 }
 
@@ -83,6 +89,10 @@ export async function deleteProductAction(
   _prevState: ProductActionState,
   formData: FormData
 ): Promise<ProductActionState> {
+  if (!(await getCurrentUserId())) {
+    return { error: UNAUTHORIZED_MESSAGE }
+  }
+
   const id = formData.get("id")
   if (typeof id !== "string" || !id) {
     return { error: "Product id is required." }
@@ -93,8 +103,6 @@ export async function deleteProductAction(
     revalidatePath("/dashboard/products")
     return {}
   } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Failed to delete product.",
-    }
+    return { error: toClientErrorMessage(err, "Failed to delete product.") }
   }
 }

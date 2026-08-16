@@ -82,14 +82,18 @@ export async function updateCategory(id: string, input: CategoryUpdateInput) {
     throw new Error("No store found.")
   }
 
-  return prisma.category.update({
-    where: { id },
+  const { count } = await prisma.category.updateMany({
+    where: { id, storeId },
     data: {
       name: input.name,
       slug: input.slug,
       description: input.description ?? null,
     },
   })
+
+  if (count === 0) {
+    throw new Error("Category not found.")
+  }
 }
 
 /**
@@ -101,7 +105,11 @@ export async function deleteCategory(id: string) {
     throw new Error("No store found.")
   }
 
-  return prisma.category.delete({
-    where: { id },
+  const { count } = await prisma.category.deleteMany({
+    where: { id, storeId },
   })
+
+  if (count === 0) {
+    throw new Error("Category not found.")
+  }
 }
