@@ -1,5 +1,6 @@
 import { prisma } from "./prisma"
 import { getDefaultStoreId } from "./store"
+import { AppError } from "../errors"
 
 export interface ProductInput {
   name: string
@@ -132,7 +133,7 @@ export async function listProductsByCategory(categorySlug: string) {
 export async function createProduct(input: ProductInput) {
   const storeId = await getDefaultStoreId()
   if (!storeId) {
-    throw new Error("No store found. Create a store before adding products.")
+    throw new AppError("No store found. Create a store before adding products.")
   }
 
   return prisma.product.create({
@@ -155,7 +156,9 @@ export async function createProduct(input: ProductInput) {
 export async function updateProduct(id: string, input: ProductUpdateInput) {
   const storeId = await getDefaultStoreId()
   if (!storeId) {
-    throw new Error("No store found.")
+    throw new AppError(
+      "No store found. Create a store before making changes."
+    )
   }
 
   return prisma.product.update({
@@ -178,7 +181,9 @@ export async function updateProduct(id: string, input: ProductUpdateInput) {
 export async function deleteProduct(id: string) {
   const storeId = await getDefaultStoreId()
   if (!storeId) {
-    throw new Error("No store found.")
+    throw new AppError(
+      "No store found. Create a store before making changes."
+    )
   }
 
   return prisma.product.delete({

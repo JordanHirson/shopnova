@@ -1,5 +1,6 @@
 import { prisma } from "./prisma"
 import { getDefaultStoreId } from "./store"
+import { AppError } from "../errors"
 
 export interface CategoryInput {
   name: string
@@ -60,7 +61,7 @@ export async function getCategoryBySlug(slug: string) {
 export async function createCategory(input: CategoryInput) {
   const storeId = await getDefaultStoreId()
   if (!storeId) {
-    throw new Error("No store found. Create a store before adding categories.")
+    throw new AppError("No store found. Create a store before adding categories.")
   }
 
   return prisma.category.create({
@@ -79,7 +80,9 @@ export async function createCategory(input: CategoryInput) {
 export async function updateCategory(id: string, input: CategoryUpdateInput) {
   const storeId = await getDefaultStoreId()
   if (!storeId) {
-    throw new Error("No store found.")
+    throw new AppError(
+      "No store found. Create a store before making changes."
+    )
   }
 
   return prisma.category.update({
@@ -98,7 +101,9 @@ export async function updateCategory(id: string, input: CategoryUpdateInput) {
 export async function deleteCategory(id: string) {
   const storeId = await getDefaultStoreId()
   if (!storeId) {
-    throw new Error("No store found.")
+    throw new AppError(
+      "No store found. Create a store before making changes."
+    )
   }
 
   return prisma.category.delete({

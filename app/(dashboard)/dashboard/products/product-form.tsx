@@ -90,12 +90,17 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
   function handleSubmit(formData: FormData) {
     setError(undefined)
     startTransition(async () => {
-      const result = await action({} as ProductActionState, formData)
-      if (result.error) {
-        setError(result.error)
-      } else {
+      try {
+        const result = await action({} as ProductActionState, formData)
+        if (result.error) {
+          setError(result.error)
+          return
+        }
         setOpen(false)
         onSuccess?.()
+      } catch (err) {
+        console.error("Product form submission failed:", err)
+        setError("Something went wrong. Please try again.")
       }
     })
   }
@@ -267,11 +272,19 @@ export function DeleteProductButton({ product }: { product: Product }) {
   function handleDelete(formData: FormData) {
     setError(undefined)
     startTransition(async () => {
-      const result = await deleteProductAction({} as ProductActionState, formData)
-      if (result.error) {
-        setError(result.error)
-      } else {
+      try {
+        const result = await deleteProductAction(
+          {} as ProductActionState,
+          formData
+        )
+        if (result.error) {
+          setError(result.error)
+          return
+        }
         setOpen(false)
+      } catch (err) {
+        console.error("Product deletion failed:", err)
+        setError("Something went wrong. Please try again.")
       }
     })
   }

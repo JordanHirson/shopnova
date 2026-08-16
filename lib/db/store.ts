@@ -1,4 +1,5 @@
 import { prisma } from "./prisma"
+import { logWarning } from "../errors"
 
 /**
  * Returns the first store in the database.
@@ -17,5 +18,12 @@ export async function getDefaultStore() {
  */
 export async function getDefaultStoreId(): Promise<string | null> {
   const store = await getDefaultStore()
-  return store?.id ?? null
+  if (!store) {
+    logWarning(
+      "getDefaultStoreId",
+      "no store exists — reads will look empty. Run `npm run db:seed`."
+    )
+    return null
+  }
+  return store.id
 }

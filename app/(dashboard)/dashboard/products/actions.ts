@@ -7,6 +7,7 @@ import {
   updateProduct,
   deleteProduct,
 } from "@/lib/db"
+import { toUserMessage } from "@/lib/errors"
 
 export type ProductActionState = {
   error?: string
@@ -38,7 +39,11 @@ export async function createProductAction(
     return {}
   } catch (err) {
     return {
-      error: err instanceof Error ? err.message : "Failed to create product.",
+      error: toUserMessage(
+        "createProductAction",
+        err,
+        "Failed to create product."
+      ),
     }
   }
 }
@@ -74,7 +79,11 @@ export async function updateProductAction(
     return {}
   } catch (err) {
     return {
-      error: err instanceof Error ? err.message : "Failed to update product.",
+      error: toUserMessage(
+        "updateProductAction",
+        err,
+        "Failed to update product."
+      ),
     }
   }
 }
@@ -94,7 +103,11 @@ export async function deleteProductAction(
     return {}
   } catch (err) {
     return {
-      error: err instanceof Error ? err.message : "Failed to delete product.",
+      error: toUserMessage(
+        "deleteProductAction",
+        err,
+        "Failed to delete product."
+      ),
     }
   }
 }
