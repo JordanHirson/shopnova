@@ -1,9 +1,11 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
-import { ImageIcon } from "lucide-react"
 import { Container } from "@/components/layout/container"
+import { ProductImage } from "@/components/storefront/product-image"
+import { TextLink } from "@/components/storefront/text-link"
 import { Button } from "@/components/ui/button"
 import { getProductBySlug } from "@/lib/db"
+import { formatPrice } from "@/lib/utils"
 
 export const dynamic = "force-dynamic"
 
@@ -21,49 +23,31 @@ export default async function ProductDetailsPage({
     notFound()
   }
 
-  const image = product.images[0]
+  const categoryHref = `/categories/${product.category.slug}`
 
   return (
     <div className="py-12 sm:py-16">
       <Container>
         <div className="mb-8">
-          <Link
-            href="/products"
-            className="text-sm font-medium text-primary hover:underline"
-          >
-            &larr; All Products
-          </Link>
+          <TextLink href="/products">&larr; All Products</TextLink>
         </div>
         <div className="grid gap-8 lg:grid-cols-2">
           {/* Product image */}
-          <div className="relative aspect-square w-full overflow-hidden rounded-lg border bg-muted">
-            {image ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img
-                src={image.url}
-                alt={image.alt ?? product.name}
-                className="h-full w-full object-cover"
-              />
-            ) : (
-              <div className="flex h-full w-full items-center justify-center">
-                <ImageIcon className="h-16 w-16 text-muted-foreground/40" />
-              </div>
-            )}
-          </div>
+          <ProductImage
+            image={product.images[0]}
+            name={product.name}
+            className="rounded-lg border"
+            iconClassName="h-16 w-16"
+          />
 
           {/* Product details */}
           <div className="flex flex-col gap-4">
-            <Link
-              href={`/categories/${product.category.slug}`}
-              className="text-sm font-medium text-primary hover:underline"
-            >
-              {product.category.name}
-            </Link>
+            <TextLink href={categoryHref}>{product.category.name}</TextLink>
             <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
               {product.name}
             </h1>
             <p className="text-2xl font-semibold text-foreground">
-              ${product.price.toString()}
+              {formatPrice(product.price)}
             </p>
             {product.description && (
               <p className="text-muted-foreground whitespace-pre-line">
@@ -74,10 +58,7 @@ export default async function ProductDetailsPage({
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Category</dt>
                 <dd className="text-right font-medium text-foreground">
-                  <Link
-                    href={`/categories/${product.category.slug}`}
-                    className="hover:underline"
-                  >
+                  <Link href={categoryHref} className="hover:underline">
                     {product.category.name}
                   </Link>
                 </dd>

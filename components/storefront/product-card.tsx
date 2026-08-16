@@ -1,5 +1,7 @@
 import Link from "next/link"
-import { ImageIcon } from "lucide-react"
+
+import { ProductImage } from "@/components/storefront/product-image"
+import { formatPrice } from "@/lib/utils"
 
 interface ProductCardProps {
   product: {
@@ -13,27 +15,16 @@ interface ProductCardProps {
 }
 
 export function ProductCard({ product }: ProductCardProps) {
-  const image = product.images[0]
-
   return (
     <Link
       href={`/products/${product.slug}`}
       className="group flex flex-col overflow-hidden rounded-lg border bg-background transition-shadow hover:shadow-md"
     >
-      <div className="relative aspect-square w-full overflow-hidden bg-muted">
-        {image ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={image.url}
-            alt={image.alt ?? product.name}
-            className="h-full w-full object-cover transition-transform group-hover:scale-105"
-          />
-        ) : (
-          <div className="flex h-full w-full items-center justify-center">
-            <ImageIcon className="h-10 w-10 text-muted-foreground/40" />
-          </div>
-        )}
-      </div>
+      <ProductImage
+        image={product.images[0]}
+        name={product.name}
+        imageClassName="transition-transform group-hover:scale-105"
+      />
       <div className="flex flex-1 flex-col gap-1 p-4">
         <p className="text-xs font-medium text-muted-foreground">
           {product.category.name}
@@ -42,7 +33,7 @@ export function ProductCard({ product }: ProductCardProps) {
           {product.name}
         </h3>
         <p className="mt-auto pt-2 text-sm font-semibold text-foreground">
-          ${product.price.toString()}
+          {formatPrice(product.price)}
         </p>
       </div>
     </Link>
