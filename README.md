@@ -22,6 +22,19 @@ npm run dev
 
 Open [http://localhost:3000](http://localhost:3000).
 
+## Testing
+
+Unit tests run with [Vitest](https://vitest.dev) and require no database — Prisma is mocked.
+
+```bash
+npm test              # run the suite once
+npm run test:watch    # watch mode
+npm run test:coverage # coverage report (text + coverage/index.html)
+```
+
+Tests live in `tests/`, mirroring the source layout, and cover `lib/utils.ts`, the Zod
+validation schemas, the `lib/db` query helpers, and the dashboard server actions.
+
 ## Database Setup
 
 ```bash
