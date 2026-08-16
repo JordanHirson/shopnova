@@ -1,5 +1,5 @@
 import { prisma } from "./prisma"
-import { getDefaultStoreId } from "./store"
+import { requireStoreId, withStore } from "./utils"
 
 export interface ProductInput {
   name: string
@@ -11,141 +11,139 @@ export interface ProductInput {
   categoryId: string
 }
 
-export interface ProductUpdateInput {
-  name: string
-  slug: string
-  description?: string | null
-  price: string
-  compareAtPrice?: string | null
-  sku?: string | null
-  categoryId: string
+export type ProductUpdateInput = ProductInput
+
+/** Category fields needed by the dashboard product list. */
+const dashboardInclude = {
+  category: { select: { id: true, name: true } },
+} as const
+
+/** Category fields and the primary image needed by storefront listings. */
+const storefrontInclude = {
+  category: { select: { id: true, name: true, slug: true } },
+  images: { orderBy: { sortOrder: "asc" }, take: 1 },
+} as const
+
+function productData(input: ProductInput) {
+  return {
+    name: input.name,
+    slug: input.slug,
+    description: input.description ?? null,
+    price: input.price,
+    compareAtPrice: input.compareAtPrice ?? null,
+    sku: input.sku ?? null,
+    categoryId: input.categoryId,
+  }
 }
 
 /**
  * Lists all products for the default store, ordered by name.
  */
-export async function listProducts() {
-  const storeId = await getDefaultStoreId()
-  if (!storeId) return []
-
-  return prisma.product.findMany({
-    where: { storeId },
-    orderBy: { name: "asc" },
-    include: {
-      category: { select: { id: true, name: true } },
-    },
-  })
+export function listProducts() {
+  return withStore(
+    (storeId) =>
+      prisma.product.findMany({
+        where: { storeId },
+        orderBy: { name: "asc" },
+        include: dashboardInclude,
+      }),
+    []
+  )
 }
 
 /**
  * Returns a single product by id for the default store.
  */
-export async function getProductById(id: string) {
-  const storeId = await getDefaultStoreId()
-  if (!storeId) return null
-
-  return prisma.product.findFirst({
-    where: { id, storeId },
-    include: {
-      category: { select: { id: true, name: true } },
-    },
-  })
+export function getProductById(id: string) {
+  return withStore(
+    (storeId) =>
+      prisma.product.findFirst({
+        where: { id, storeId },
+        include: dashboardInclude,
+      }),
+    null
+  )
 }
 
 /**
  * Returns a single product by slug for the default store.
  * Used by the public storefront.
  */
-export async function getProductBySlug(slug: string) {
-  const storeId = await getDefaultStoreId()
-  if (!storeId) return null
-
-  return prisma.product.findFirst({
-    where: { slug, storeId },
-    include: {
-      category: { select: { id: true, name: true, slug: true } },
-      images: { orderBy: { sortOrder: "asc" } },
-    },
-  })
+export function getProductBySlug(slug: string) {
+  return withStore(
+    (storeId) =>
+      prisma.product.findFirst({
+        where: { slug, storeId },
+        include: {
+          category: { select: { id: true, name: true, slug: true } },
+          images: { orderBy: { sortOrder: "asc" } },
+        },
+      }),
+    null
+  )
 }
 
 /**
  * Lists all products for the default store, including the first image.
  * Used by the public storefront product listing page.
  */
-export async function listStorefrontProducts() {
-  const storeId = await getDefaultStoreId()
-  if (!storeId) return []
-
-  return prisma.product.findMany({
-    where: { storeId },
-    orderBy: { name: "asc" },
-    include: {
-      category: { select: { id: true, name: true, slug: true } },
-      images: { orderBy: { sortOrder: "asc" }, take: 1 },
-    },
-  })
+export function listStorefrontProducts() {
+  return withStore(
+    (storeId) =>
+      prisma.product.findMany({
+        where: { storeId },
+        orderBy: { name: "asc" },
+        include: storefrontInclude,
+      }),
+    []
+  )
 }
 
 /**
  * Lists a limited number of products for the storefront home page.
  */
-export async function listFeaturedProducts(limit = 8) {
-  const storeId = await getDefaultStoreId()
-  if (!storeId) return []
-
-  return prisma.product.findMany({
-    where: { storeId },
-    orderBy: { createdAt: "desc" },
-    take: limit,
-    include: {
-      category: { select: { id: true, name: true, slug: true } },
-      images: { orderBy: { sortOrder: "asc" }, take: 1 },
-    },
-  })
+export function listFeaturedProducts(limit = 8) {
+  return withStore(
+    (storeId) =>
+      prisma.product.findMany({
+        where: { storeId },
+        orderBy: { createdAt: "desc" },
+        take: limit,
+        include: storefrontInclude,
+      }),
+    []
+  )
 }
 
 /**
  * Lists products belonging to a category by category slug.
  * Used by the public storefront category page.
  */
-export async function listProductsByCategory(categorySlug: string) {
-  const storeId = await getDefaultStoreId()
-  if (!storeId) return []
-
-  return prisma.product.findMany({
-    where: {
-      storeId,
-      category: { slug: categorySlug },
-    },
-    orderBy: { name: "asc" },
-    include: {
-      category: { select: { id: true, name: true, slug: true } },
-      images: { orderBy: { sortOrder: "asc" }, take: 1 },
-    },
-  })
+export function listProductsByCategory(categorySlug: string) {
+  return withStore(
+    (storeId) =>
+      prisma.product.findMany({
+        where: {
+          storeId,
+          category: { slug: categorySlug },
+        },
+        orderBy: { name: "asc" },
+        include: storefrontInclude,
+      }),
+    []
+  )
 }
 
 /**
  * Creates a new product for the default store.
  */
 export async function createProduct(input: ProductInput) {
-  const storeId = await getDefaultStoreId()
-  if (!storeId) {
-    throw new Error("No store found. Create a store before adding products.")
-  }
+  const storeId = await requireStoreId(
+    "No store found. Create a store before adding products."
+  )
 
   return prisma.product.create({
-    data: {
-      name: input.name,
-      slug: input.slug,
-      description: input.description ?? null,
-      price: input.price,
-      compareAtPrice: input.compareAtPrice ?? null,
-      sku: input.sku ?? null,
-      categoryId: input.categoryId,
-      storeId,
-    },
+    data: { ...productData(input), storeId },
   })
 }
 
@@ -153,22 +151,11 @@ export async function createProduct(input: ProductInput) {
  * Updates an existing product for the default store.
  */
 export async function updateProduct(id: string, input: ProductUpdateInput) {
-  const storeId = await getDefaultStoreId()
-  if (!storeId) {
-    throw new Error("No store found.")
-  }
+  await requireStoreId()
 
   return prisma.product.update({
     where: { id },
-    data: {
-      name: input.name,
-      slug: input.slug,
-      description: input.description ?? null,
-      price: input.price,
-      compareAtPrice: input.compareAtPrice ?? null,
-      sku: input.sku ?? null,
-      categoryId: input.categoryId,
-    },
+    data: productData(input),
   })
 }
 
@@ -176,10 +163,7 @@ export async function updateProduct(id: string, input: ProductUpdateInput) {
  * Deletes a product by id for the default store.
  */
 export async function deleteProduct(id: string) {
-  const storeId = await getDefaultStoreId()
-  if (!storeId) {
-    throw new Error("No store found.")
-  }
+  await requireStoreId()
 
   return prisma.product.delete({
     where: { id },

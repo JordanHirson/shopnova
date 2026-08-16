@@ -1,92 +1,48 @@
 "use server"
 
-import { revalidatePath } from "next/cache"
-import { categorySchema } from "@/lib/validations/category"
 import {
-  createCategory,
-  updateCategory,
-  deleteCategory,
-} from "@/lib/db"
+  createEntity,
+  deleteEntity,
+  updateEntity,
+  type ActionState,
+  type EntityActionConfig,
+} from "@/lib/actions/crud"
+import {
+  categorySchema,
+  type CategoryFormValues,
+} from "@/lib/validations/category"
+import { createCategory, updateCategory, deleteCategory } from "@/lib/db"
 
-export type CategoryActionState = {
-  error?: string
+export type CategoryActionState = ActionState
+
+const categoryConfig: EntityActionConfig<CategoryFormValues> = {
+  label: "category",
+  revalidate: "/dashboard/categories",
+  schema: categorySchema,
+  fromFormData: (formData) => ({
+    name: formData.get("name"),
+    slug: formData.get("slug"),
+    description: formData.get("description") || null,
+  }),
 }
 
 export async function createCategoryAction(
   _prevState: CategoryActionState,
   formData: FormData
 ): Promise<CategoryActionState> {
-  const parsed = categorySchema.safeParse({
-    name: formData.get("name"),
-    slug: formData.get("slug"),
-    description: formData.get("description") || null,
-  })
-
-  if (!parsed.success) {
-    return {
-      error: parsed.error.issues[0]?.message ?? "Invalid category data.",
-    }
-  }
-
-  try {
-    await createCategory(parsed.data)
-    revalidatePath("/dashboard/categories")
-    return {}
-  } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Failed to create category.",
-    }
-  }
+  return createEntity(categoryConfig, formData, createCategory)
 }
 
 export async function updateCategoryAction(
   _prevState: CategoryActionState,
   formData: FormData
 ): Promise<CategoryActionState> {
-  const id = formData.get("id")
-  if (typeof id !== "string" || !id) {
-    return { error: "Category id is required." }
-  }
-
-  const parsed = categorySchema.safeParse({
-    name: formData.get("name"),
-    slug: formData.get("slug"),
-    description: formData.get("description") || null,
-  })
-
-  if (!parsed.success) {
-    return {
-      error: parsed.error.issues[0]?.message ?? "Invalid category data.",
-    }
-  }
-
-  try {
-    await updateCategory(id, parsed.data)
-    revalidatePath("/dashboard/categories")
-    return {}
-  } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Failed to update category.",
-    }
-  }
+  return updateEntity(categoryConfig, formData, updateCategory)
 }
 
 export async function deleteCategoryAction(
   _prevState: CategoryActionState,
   formData: FormData
 ): Promise<CategoryActionState> {
-  const id = formData.get("id")
-  if (typeof id !== "string" || !id) {
-    return { error: "Category id is required." }
-  }
-
-  try {
-    await deleteCategory(id)
-    revalidatePath("/dashboard/categories")
-    return {}
-  } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Failed to delete category.",
-    }
-  }
+  return deleteEntity(categoryConfig, formData, deleteCategory)
 }
