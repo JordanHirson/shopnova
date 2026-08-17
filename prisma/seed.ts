@@ -32,9 +32,14 @@ try {
   }
 }
 
-const connectionString =
-  process.env.DATABASE_URL ??
-  "postgresql://postgres:newpostgres@localhost:5432/shopnova?schema=public"
+if (!process.env.DATABASE_URL) {
+  console.error(
+    "DATABASE_URL is not set. Add it to your .env.local file before running the seed."
+  )
+  process.exit(1)
+}
+
+const connectionString = process.env.DATABASE_URL
 
 const adapter = new PrismaPg({ connectionString })
 const prisma = new PrismaClient({ adapter })

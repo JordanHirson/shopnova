@@ -1,18 +1,18 @@
 # ShopNova
 
-**AI-native e-commerce SaaS MVP.**
+**E-commerce SaaS MVP.**
 
-ShopNova is a modern, AI-powered e-commerce platform built with Next.js (App Router), TypeScript, Tailwind CSS, Prisma, Supabase, and shadcn/ui.
+ShopNova is a modern e-commerce platform built with Next.js (App Router), TypeScript, Tailwind CSS, Prisma, PostgreSQL 18 + pgvector, Clerk, and shadcn/ui.
 
 ## Stack
 
 - **Framework:** Next.js (App Router)
 - **Language:** TypeScript
-- **Styling:** Tailwind CSS v4 + shadcn/ui
-- **Database ORM:** Prisma
-- **Backend:** Supabase
+- **Styling:** Tailwind CSS v4 + shadcn/ui Base UI
+- **Database:** PostgreSQL 18 + pgvector
+- **Database ORM:** Prisma 7
+- **Authentication:** Clerk
 - **Forms:** React Hook Form + Zod
-- **Data Fetching:** TanStack Query
 
 ## Getting Started
 
@@ -21,6 +21,14 @@ npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000).
+
+## Tests
+
+```bash
+npm test
+```
+
+Runs the cart business logic unit tests using Node's native test runner.
 
 ## Database Setup
 

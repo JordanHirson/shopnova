@@ -2,8 +2,8 @@ import Link from "next/link"
 import { notFound } from "next/navigation"
 import { ImageIcon } from "lucide-react"
 import { Container } from "@/components/layout/container"
-import { Button } from "@/components/ui/button"
-import { getProductBySlug } from "@/lib/db"
+import { AddToCartButton } from "@/components/storefront/add-to-cart-button"
+import { getProductBySlug, getCartProduct } from "@/lib/db"
 
 export const dynamic = "force-dynamic"
 
@@ -20,6 +20,11 @@ export default async function ProductDetailsPage({
   if (!product) {
     notFound()
   }
+
+  // Current authoritative price + available inventory for add-to-cart.
+  const cartProduct = await getCartProduct(product.id)
+  const availableQuantity = cartProduct?.quantityAvailable ?? 0
+  const displayPrice = cartProduct?.price ?? Number(product.price)
 
   const image = product.images[0]
 
@@ -63,7 +68,7 @@ export default async function ProductDetailsPage({
               {product.name}
             </h1>
             <p className="text-2xl font-semibold text-foreground">
-              ${product.price.toString()}
+              ${displayPrice.toFixed(2)}
             </p>
             {product.description && (
               <p className="text-muted-foreground whitespace-pre-line">
@@ -88,11 +93,27 @@ export default async function ProductDetailsPage({
                   <dd className="font-medium text-foreground">{product.sku}</dd>
                 </div>
               )}
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">Availability</dt>
+                <dd
+                  className={
+                    availableQuantity > 0
+                      ? "font-medium text-foreground"
+                      : "font-medium text-destructive"
+                  }
+                >
+                  {availableQuantity > 0
+                    ? `In stock (${availableQuantity} available)`
+                    : "Out of stock"}
+                </dd>
+              </div>
             </dl>
             <div className="mt-2">
-              <Button size="lg" type="button">
-                Add to Cart
-              </Button>
+              <AddToCartButton
+                productId={product.id}
+                quantity={1}
+                maxQuantity={availableQuantity}
+              />
             </div>
           </div>
         </div>
