@@ -28,7 +28,7 @@ Open [http://localhost:3000](http://localhost:3000).
 npm test
 ```
 
-Runs the cart business logic unit tests using Node's native test runner.
+Runs the cart and checkout business logic unit tests (VAT, shipping, order totals, inventory validation) using Node's native test runner.
 
 ## Database Setup
 

@@ -133,6 +133,17 @@ model Order {
   shipping    Decimal     @default(0) @db.Decimal(10, 2)
   total       Decimal     @db.Decimal(10, 2)
 
+  // Shipping snapshot captured at order time.
+  shippingFirstName  String  @db.VarChar(255)
+  shippingLastName   String  @db.VarChar(255)
+  shippingEmail      String  @db.VarChar(255)
+  shippingPhone      String? @db.VarChar(50)
+  shippingAddress    String  @db.VarChar(255)
+  shippingCity       String  @db.VarChar(255)
+  shippingProvince   String  @db.VarChar(255)
+  shippingPostalCode String  @db.VarChar(20)
+  shippingCountry    String  @db.VarChar(255)
+
   storeId    String   @db.Uuid
   store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   customerId String   @db.Uuid

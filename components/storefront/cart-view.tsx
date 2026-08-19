@@ -192,12 +192,12 @@ export function CartView() {
           </span>
         </div>
         <div className="mt-4 flex flex-col gap-3">
-          <Button size="lg" type="button" disabled>
+          <Link
+            href="/checkout"
+            className={buttonVariants({ size: "lg" })}
+          >
             Proceed to Checkout
-          </Button>
-          <p className="text-center text-xs text-muted-foreground">
-            Checkout will be available in the next sprint.
-          </p>
+          </Link>
           <Button
             type="button"
             variant="outline"
