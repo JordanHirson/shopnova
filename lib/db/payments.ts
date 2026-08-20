@@ -25,6 +25,7 @@ import {
 } from "@/features/checkout/checkout-logic"
 import type { PaymentNotification, PaymentProviderId } from "@/features/payment/types"
 import { cartStore } from "@/features/cart/cart-store"
+import { clerkUserIdFromShopperId } from "@/features/account/account-logic"
 
 /** A single product line stored on an intent (authoritative quantity snapshot). */
 export interface IntentLine {
@@ -258,12 +259,16 @@ export async function completePaidIntent(
     const total = calculateOrderTotal(computedSubtotal, shipping, vat)
 
     // 4. Find or create the Customer (preserves @@unique([storeId, email])).
+    //    If the shopper was signed in at checkout, link the Customer to their
+    //    Clerk user id so the account area can authorize order access.
+    const clerkUserId = clerkUserIdFromShopperId(intent.shopperId)
     const customer = await tx.customer.upsert({
       where: { storeId_email: { storeId: intent.storeId, email: details.email } },
       update: {
         firstName: details.firstName,
         lastName: details.lastName,
         phone: details.phone,
+        ...(clerkUserId ? { clerkUserId } : {}),
       },
       create: {
         storeId: intent.storeId,
@@ -271,6 +276,7 @@ export async function completePaidIntent(
         firstName: details.firstName,
         lastName: details.lastName,
         phone: details.phone,
+        ...(clerkUserId ? { clerkUserId } : {}),
       },
     })
 

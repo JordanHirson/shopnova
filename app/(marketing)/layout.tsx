@@ -1,5 +1,6 @@
 import Link from "next/link"
 import { Container } from "@/components/layout/container"
+import { AccountButton } from "@/components/storefront/account-button"
 import { CartButton } from "@/components/storefront/cart-button"
 import { CartProvider } from "@/features/cart/cart-context"
 import { Package } from "lucide-react"
@@ -56,7 +57,10 @@ export default function MarketingLayout({
                 Contact
               </Link>
             </nav>
-            <CartButton />
+            <div className="flex items-center gap-2">
+              <CartButton />
+              <AccountButton />
+            </div>
           </Container>
         </header>
         <main className="flex-1">{children}</main>

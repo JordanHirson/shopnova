@@ -54,7 +54,7 @@ export default async function ProductsPage() {
                     {product.category.name}
                   </TableCell>
                   <TableCell className="text-right">
-                    {product.price.toString()}
+                    R {product.price.toString()}
                   </TableCell>
                   <TableCell className="text-right">
                     <div className="flex items-center justify-end gap-1">

@@ -28,7 +28,7 @@ Open [http://localhost:3000](http://localhost:3000).
 npm test
 ```
 
-Runs the cart, checkout, and payment business logic + webhook verification unit tests using Node's native test runner. Covers VAT, shipping, order totals, inventory validation, payment provider selection, authoritative-amount guards, and Stripe/PayFast/Test webhook signature verification. No real payment credentials are required — provider adapters are tested with mock credentials and real signature math.
+Runs the cart, checkout, payment, and customer-account business logic + webhook verification unit tests using Node's native test runner. Covers VAT, shipping, order totals, inventory validation, payment provider selection, authoritative-amount guards, Stripe/PayFast/Test webhook signature verification, Clerk/customer association, and order-ownership authorization. No real payment credentials are required — provider adapters are tested with mock credentials and real signature math.
 
 A small loader shim (`scripts/test-register.mjs`) maps the `server-only` marker package to an empty module so payment provider modules can be imported by the test runner outside a React server context.
 
@@ -43,6 +43,14 @@ ShopNova uses hosted payment UIs so raw card data never touches the server (PCI-
 Orders are created only after a server-verified payment notification. Duplicate webhooks are idempotent. Payment amounts are derived from authoritative server-side values, never client-supplied totals.
 
 See `.env.example` for the required environment variables (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `PAYFAST_MERCHANT_ID`, `PAYFAST_MERCHANT_KEY`, `PAYFAST_PASSPHRASE`, `PAYFAST_TEST_MODE`, optional `TEST_PAYMENT_SECRET`). None are required to run the test suite or to use the local Test gateway.
+
+## Customer Accounts & Order History
+
+Authenticated customers can view their account and order history at `/account`, `/account/orders`, and `/account/orders/[orderNumber]`. Clerk is the authentication source of truth — there is no second auth system.
+
+- **Clerk ↔ Customer link:** A nullable, unique `Customer.clerkUserId` column associates an authenticated Clerk user with their Customer row. The link is set during checkout when a signed-in shopper completes payment. Guest checkouts are not linked.
+- **Security:** Every order query is scoped server-side to the authenticated customer's id. A customer cannot retrieve another customer's order by changing an order number in the URL — foreign orders return `notFound()`, identical to missing ones.
+- **Auth checks:** In-page `redirect("/sign-in?redirect_url=...")` is used instead of middleware `auth.protect()` (deprecated in Clerk v7 under Next.js 16).
 
 ## Database Setup
 

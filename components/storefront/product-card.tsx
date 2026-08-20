@@ -42,7 +42,7 @@ export function ProductCard({ product }: ProductCardProps) {
           {product.name}
         </h3>
         <p className="mt-auto pt-2 text-sm font-semibold text-foreground">
-          ${product.price.toString()}
+          R {product.price.toString()}
         </p>
       </div>
     </Link>

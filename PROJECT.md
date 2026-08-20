@@ -76,6 +76,18 @@ scripts/          # Utility scripts (e.g. zip-project)
 - **Shipping seam:** `features/shipping/shipping-provider.ts` introduces a `ShippingProvider` interface (`quote`). The default `MvpShippingProvider` keeps the deterministic free-above-$50 / flat-$5 rule from checkout-logic. Live courier integrations (Bob Go, Aramex, PUDO, Courier Guy) can later implement the same interface and be registered without touching checkout business logic or the UI.
 - **Tests:** 11 payment-logic tests (`features/payment/payment-logic.test.ts`) + 15 webhook verification tests (`features/payment/payment-webhook.test.ts`) using the REAL provider adapter code with mock credentials. The test runner shims the `server-only` marker package via `scripts/test-register.mjs` + `scripts/test-loader.mjs` so provider modules can be imported outside a React server context.
 
+## Customer Accounts & Order History (Sprint 4)
+
+- **Clerk ↔ Customer link:** A nullable, unique `Customer.clerkUserId` column (additive schema change) associates an authenticated Clerk user with their existing Customer row. The link is set during checkout inside `completePaidIntent` when the shopper is signed in (`shopperId` starts with `user:<clerkUserId>`). Guest checkouts leave `clerkUserId` null. Clerk remains the authentication source of truth; no second auth system is introduced.
+- **Customer resolution:** `lib/db/customers.ts` `getCustomerForClerkUser(clerkUserId)` resolves the authenticated Clerk user to their Customer row (within the default store). Returns null for a brand-new account that has never completed a signed-in checkout.
+- **Authorized order queries:** `lib/db/orders.ts` adds `getOrdersForCustomer(customerId)` and `getOrderForCustomer(customerId, orderNumber)`. Both scope every query to the authenticated customer's id — this is the authorization boundary. A foreign order number returns null (identical to a missing one), so a customer can neither view nor confirm another customer's order by manipulating the URL.
+- **Pure auth helpers:** `features/account/account-logic.ts` provides `clerkUserIdFromShopperId`, `isOrderOwnedByCustomer`, `assertOrderOwnedByCustomer`, and `buildDisplayName` — side-effect-free functions unit-tested with Node's native test runner.
+- **Routes:** `/account` (overview with Clerk name/email + order count), `/account/orders` (order history table with empty-state), `/account/orders/[orderNumber]` (order detail: items, line totals, subtotal/VAT/shipping/total, shipping/contact info, payment summary). All three redirect unauthenticated users to `/sign-in?redirect_url=...` via in-page `redirect()`.
+- **Auth strategy:** In-page `redirect()` is used instead of middleware `auth.protect()` because Clerk v7 deprecates `createRouteMatcher` and `auth.protect()` returns 404 (instead of redirecting) under Next.js 16. The in-page check is the recommended resource-based approach per Clerk's migration guide.
+- **Navigation:** `components/storefront/account-button.tsx` shows "Sign in" for anonymous shoppers and an Account link + Clerk `UserButton` for signed-in shoppers. Added to the marketing header alongside the cart button.
+- **Existing data:** The schema change is additive. Existing customers/orders are preserved. Existing guest-checkout customers have `clerkUserId = null` and their orders are not accessible through the account area (by design — they were placed as a guest).
+- **Tests:** 15 account-logic tests (`features/account/account-logic.test.ts`) covering Clerk/customer association, order ownership (own / foreign / guest / missing), `assertOrderOwnedByCustomer` throw behavior, and display-name fallbacks. Total test suite: 71 tests.
+
 ## Commands
 
 | Command | Description |

@@ -127,6 +127,9 @@ model Customer {
   lastName  String? @db.VarChar(255)
   phone     String? @db.VarChar(50)
 
+  /** Clerk user id of the authenticated storefront customer (nullable for guest checkouts). */
+  clerkUserId String? @unique @db.VarChar(255)
+
   storeId String @db.Uuid
   store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
 

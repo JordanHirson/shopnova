@@ -123,7 +123,7 @@ export function CartView() {
                     {item.name}
                   </Link>
                   <p className="text-sm text-muted-foreground">
-                    ${item.unitPrice.toFixed(2)} each
+                    R {item.unitPrice.toFixed(2)} each
                   </p>
                 </div>
                 <Button
@@ -172,7 +172,7 @@ export function CartView() {
                   </Button>
                 </div>
                 <p className="font-semibold text-foreground">
-                  ${item.lineTotal.toFixed(2)}
+                  R {item.lineTotal.toFixed(2)}
                 </p>
               </div>
             </div>
@@ -188,7 +188,7 @@ export function CartView() {
         <div className="flex justify-between border-b pb-4 text-sm">
           <span className="text-muted-foreground">Subtotal</span>
           <span className="font-semibold text-foreground">
-            ${subtotal.toFixed(2)}
+            R {subtotal.toFixed(2)}
           </span>
         </div>
         <div className="mt-4 flex flex-col gap-3">

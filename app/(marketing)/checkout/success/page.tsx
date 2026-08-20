@@ -52,7 +52,7 @@ export default async function CheckoutSuccessPage({
             <div className="mt-2 flex justify-between">
               <span className="text-muted-foreground">Subtotal</span>
               <span className="font-medium text-foreground">
-                ${Number(order.subtotal).toFixed(2)}
+                R {Number(order.subtotal).toFixed(2)}
               </span>
             </div>
             <div className="mt-2 flex justify-between">
@@ -60,19 +60,19 @@ export default async function CheckoutSuccessPage({
               <span className="font-medium text-foreground">
                 {Number(order.shipping) === 0
                   ? "Free"
-                  : `$${Number(order.shipping).toFixed(2)}`}
+                  : `R ${Number(order.shipping).toFixed(2)}`}
               </span>
             </div>
             <div className="mt-2 flex justify-between">
               <span className="text-muted-foreground">VAT (15%)</span>
               <span className="font-medium text-foreground">
-                ${Number(order.tax).toFixed(2)}
+                R {Number(order.tax).toFixed(2)}
               </span>
             </div>
             <div className="mt-2 flex justify-between border-t pt-2">
               <span className="font-semibold text-foreground">Total</span>
               <span className="font-semibold text-foreground">
-                ${Number(order.total).toFixed(2)}
+                R {Number(order.total).toFixed(2)}
               </span>
             </div>
           </div>

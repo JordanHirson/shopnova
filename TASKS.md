@@ -85,3 +85,19 @@
 - [ ] Redis cart store (configure REDIS_URL)
 - [ ] Order management
 - [ ] AI features
+
+## Customer Accounts & Order History
+
+- [x] Additive schema change: `Customer.clerkUserId` (nullable, unique) links Clerk users to Customer rows
+- [x] `completePaidIntent` sets `clerkUserId` on the Customer when a signed-in shopper completes checkout
+- [x] `lib/db/customers.ts` — `getCustomerForClerkUser` resolves the authenticated Clerk user to their Customer row
+- [x] `lib/db/orders.ts` — `getOrdersForCustomer` (customer-scoped order history) + `getOrderForCustomer` (customer-scoped single order)
+- [x] `features/account/account-logic.ts` — pure authorization helpers (`clerkUserIdFromShopperId`, `isOrderOwnedByCustomer`, `assertOrderOwnedByCustomer`, `buildDisplayName`)
+- [x] Account overview page (`/account`) — Clerk name/email, order count, navigation to order history
+- [x] Order history page (`/account/orders`) — order number, date, status, total, item count; empty-state handling
+- [x] Order detail page (`/account/orders/[orderNumber]`) — items, line totals, subtotal/VAT/shipping/total, shipping/contact info, payment summary
+- [x] Server-side authorization: every order query is scoped to the authenticated customer's id; foreign orders return null → `notFound()`
+- [x] In-page auth checks (`redirect("/sign-in?redirect_url=...")`) — Clerk v7 deprecates middleware-based `auth.protect()`
+- [x] Storefront header: `AccountButton` (Sign in / Account link + Clerk `UserButton`)
+- [x] Unit tests for account logic (15 tests) — Clerk/customer association, order ownership, display name fallbacks
+- [x] Verification: `npx prisma validate`, `npx prisma db push`, `npm test` (71 tests), `npx tsc --noEmit`, `npx eslint .`, `npx next build`, manual dev-server route check

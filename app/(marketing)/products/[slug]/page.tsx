@@ -68,7 +68,7 @@ export default async function ProductDetailsPage({
               {product.name}
             </h1>
             <p className="text-2xl font-semibold text-foreground">
-              ${displayPrice.toFixed(2)}
+              R {displayPrice.toFixed(2)}
             </p>
             {product.description && (
               <p className="text-muted-foreground whitespace-pre-line">

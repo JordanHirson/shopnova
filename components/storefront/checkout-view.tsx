@@ -335,11 +335,11 @@ export function CheckoutView() {
                   {item.name}
                 </Link>
                 <span className="text-xs text-muted-foreground">
-                  Qty {item.quantity} &times; ${item.unitPrice.toFixed(2)}
+                  Qty {item.quantity} &times; R {item.unitPrice.toFixed(2)}
                 </span>
               </div>
               <span className="text-sm font-semibold text-foreground">
-                ${item.lineTotal.toFixed(2)}
+                R {item.lineTotal.toFixed(2)}
               </span>
             </div>
           ))}
@@ -348,7 +348,7 @@ export function CheckoutView() {
           <div className="flex justify-between">
             <dt className="text-muted-foreground">Subtotal</dt>
             <dd className="font-medium text-foreground">
-              ${summary.subtotal.toFixed(2)}
+              R {summary.subtotal.toFixed(2)}
             </dd>
           </div>
           <div className="flex justify-between">
@@ -356,19 +356,19 @@ export function CheckoutView() {
             <dd className="font-medium text-foreground">
               {summary.shipping === 0
                 ? "Free"
-                : `$${summary.shipping.toFixed(2)}`}
+                : `R ${summary.shipping.toFixed(2)}`}
             </dd>
           </div>
           <div className="flex justify-between">
             <dt className="text-muted-foreground">VAT (15%)</dt>
             <dd className="font-medium text-foreground">
-              ${summary.vat.toFixed(2)}
+              R {summary.vat.toFixed(2)}
             </dd>
           </div>
           <div className="flex justify-between border-t pt-2 text-base">
             <dt className="font-semibold text-foreground">Total</dt>
             <dd className="font-semibold text-foreground">
-              ${summary.total.toFixed(2)}
+              R {summary.total.toFixed(2)}
             </dd>
           </div>
         </dl>
