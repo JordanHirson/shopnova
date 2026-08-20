@@ -22,6 +22,22 @@ enum OrderStatus {
   REFUNDED
 }
 
+/** Lifecycle of a payment attempt recorded on an Order (or its intent). */
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  CANCELLED
+}
+
+/** Lifecycle of a persisted checkout intent (created BEFORE payment). */
+enum CheckoutIntentStatus {
+  PENDING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
 // ── Models ────────────────────────────────────
 
 model Store {
@@ -144,6 +160,8 @@ model Order {
   shippingPostalCode String  @db.VarChar(20)
   shippingCountry    String  @db.VarChar(255)
 
+  currency String @default("ZAR") @db.VarChar(10)
+
   storeId    String   @db.Uuid
   store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   customerId String   @db.Uuid
@@ -152,12 +170,83 @@ model Order {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  items OrderItem[]
+  items    OrderItem[]
+  payments Payment[]
 
   @@index([storeId])
   @@index([customerId])
   @@index([status])
   @@map("orders")
+}
+
+/** Pending checkout created when the customer submits the info form, BEFORE payment. */
+model CheckoutIntent {
+  id          String   @id @default(uuid()) @db.Uuid
+  orderNumber String   @unique @db.VarChar(50)
+  storeId     String   @db.Uuid
+
+  /** Payment gateway selected server-side, e.g. "stripe" | "payfast". */
+  provider String @db.VarChar(40)
+
+  status CheckoutIntentStatus @default(PENDING)
+
+  /** Cart owner so the cart is cleared only after a successful payment. */
+  shopperId String @db.VarChar(255)
+
+  errorCode String? @db.VarChar(100)
+
+  /** Authoritative amount (server-computed from DB prices + VAT + shipping). */
+  amount   Decimal @db.Decimal(10, 2)
+  currency String  @default("R") @db.VarChar(10)
+
+  /** Shipping + contact snapshot captured at form submit (validated server-side). */
+  details Json
+
+  /** Cart lines snapshot [{ "productId", "quantity" }] — prices are NOT trusted here. */
+  items Json
+
+  /** Unique provider reference: Stripe Checkout Session id / PayFast payment id. */
+  providerReference String? @unique @db.VarChar(255)
+
+  /** Unique gateway event id that completed this intent (idempotency guard). */
+  completedPayloadKey String? @unique @db.VarChar(255)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  payments Payment[]
+
+  @@index([storeId])
+  @@index([status])
+  @@map("checkout_intents")
+}
+
+model Payment {
+  id          String   @id @default(uuid()) @db.Uuid
+  orderId     String   @db.Uuid
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  intentId    String   @db.Uuid
+  intent      CheckoutIntent @relation(fields: [intentId], references: [id], onDelete: Cascade)
+
+  gateway String @db.VarChar(40) // "stripe" | "payfast"
+  amount  Decimal @db.Decimal(10, 2)
+  currency String @default("R") @db.VarChar(10)
+  status  PaymentStatus @default(PENDING)
+
+  /// Unique provider reference — Stripe Checkout Session id / PayFast payment id.
+  providerReference String? @unique @db.VarChar(255)
+
+  /// Unique provider event id that confirmed this payment (idempotency).
+  eventId String? @unique @db.VarChar(255)
+
+  errorCode String? @db.VarChar(100)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([intentId])
+  @@map("payments")
 }
 
 model OrderItem {

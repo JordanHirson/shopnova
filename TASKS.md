@@ -49,11 +49,39 @@
 - [x] Order confirmation page (/checkout/success) — PENDING, not paid
 - [x] Unit tests for VAT, shipping, subtotal, total, quantity, order number (17 tests)
 
+## Payment Architecture & Integration (Sprint 3, Part 3)
+
+- [x] Prisma schema: `CheckoutIntent`, `Payment`, `PaymentStatus`, `CheckoutIntentStatus` enums
+- [x] `Order.currency` field added (additive, default `ZAR`)
+- [x] Payment-provider abstraction (`features/payment/types.ts`) — `PaymentProvider` interface
+- [x] Provider registry (`features/payment/provider-registry.ts`) — only configured gateways are selectable
+- [x] Stripe adapter (`features/payment/stripe.ts`) — hosted Checkout Sessions, HMAC-SHA256 webhook verification
+- [x] PayFast adapter (`features/payment/payfast.ts`) — hosted form, MD5 ITN signature verification
+- [x] Test/mock adapter (`features/payment/test.ts`) — signed mock gateway for local dev + tests
+- [x] Test provider gated to non-production (never registered in `NODE_ENV=production`)
+- [x] Payment business logic (`features/payment/payment-logic.ts`) — provider selection, authoritative-amount guards
+- [x] Shipping-provider seam (`features/shipping/shipping-provider.ts`) — `ShippingProvider` interface, MVP provider keeps deterministic rule
+- [x] `lib/db/payments.ts` — `createCheckoutIntent` + `completePaidIntent` (atomic, idempotent, inventory-safe)
+- [x] Order is created ONLY after a server-verified payment notification (CONFIRMED, not PENDING)
+- [x] Authoritative amount guard: gateway charge must exactly match server-computed intent amount
+- [x] Idempotency: `completedPayloadKey` unique + `status: PENDING` guarded transition prevents duplicate orders / double inventory decrement
+- [x] Raw card data never touches ShopNova servers (hosted Stripe Checkout / PayFast form / mock page)
+- [x] `startCheckoutPaymentAction` server action — validates form, creates intent, selects provider server-side, returns redirect URL
+- [x] `completeTestPaymentAction` server action — mock verified callback for the Test gateway
+- [x] Webhook API routes: `/api/webhooks/stripe`, `/api/webhooks/payfast`, `/api/webhooks/test`
+- [x] Shared webhook handler (`features/payment/webhook-handler.ts`) with correct HTTP status codes
+- [x] Mock hosted payment page (`/checkout/test-pay`) for local end-to-end verification
+- [x] Checkout view wired to the payment-gated flow (redirect to hosted payment UI)
+- [x] `/checkout/success` updated to reflect paid (CONFIRMED) vs pending status
+- [x] Removed dead code: `placeOrderAction` and `createOrder` (replaced by intent-based flow)
+- [x] Unit tests for payment logic (11 tests) — authoritative amount, provider selection, provider resolution
+- [x] Unit tests for webhook verification (15 tests) — valid/invalid/missing signatures, failed payments, ignored events, PayFast MD5 stability
+- [x] Test runner loader shim for `server-only` (`scripts/test-register.mjs` + `test-loader.mjs`)
+
 ## MVP Features (Future)
 
-- [ ] Stripe + PayFast payment integration
-- [ ] Payment processing (orders are PENDING until paid)
-- [ ] Courier/shipping API integration (currently deterministic MVP rate)
+- [ ] Live courier API integration (Bob Go, Aramex, PUDO, Courier Guy) — abstraction in place
+- [ ] Yoco + Stitch payment gateways (abstraction supports adding them)
 - [ ] Redis cart store (configure REDIS_URL)
 - [ ] Order management
 - [ ] AI features

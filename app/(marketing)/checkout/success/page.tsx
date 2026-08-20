@@ -25,19 +25,21 @@ export default async function CheckoutSuccessPage({
     notFound()
   }
 
+  const isPaid = order.status === "CONFIRMED"
+
   return (
     <div className="py-12 sm:py-16">
       <Container>
         <div className="mx-auto max-w-2xl rounded-lg border p-8 text-center">
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
-            Order Placed
+            {isPaid ? "Payment Confirmed" : "Order Placed"}
           </h1>
           <p className="mt-2 text-muted-foreground">
             Your order{" "}
             <span className="font-semibold text-foreground">
               {order.orderNumber}
             </span>{" "}
-            has been created.
+            has been {isPaid ? "paid and confirmed." : "created."}
           </p>
 
           <div className="mt-6 rounded-lg bg-muted p-4 text-left text-sm">
@@ -75,14 +77,26 @@ export default async function CheckoutSuccessPage({
             </div>
           </div>
 
-          <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
-            <p className="font-medium">Payment not yet completed</p>
-            <p className="mt-1">
-              Your order has been placed, but payment has not been processed.
-              Online payment (Stripe + PayFast) is not available yet. You will
-              be able to complete payment in a future update.
-            </p>
-          </div>
+          {isPaid ? (
+            <div className="mt-6 rounded-lg border border-green-300 bg-green-50 p-4 text-sm text-green-800">
+              <p className="font-medium">Payment received</p>
+              <p className="mt-1">
+                Your payment was verified by our payment provider and your
+                order is now confirmed. We will start preparing it for
+                shipment.
+              </p>
+            </div>
+          ) : (
+            <div className="mt-6 rounded-lg border border-amber-300 bg-amber-50 p-4 text-sm text-amber-800">
+              <p className="font-medium">Payment not yet completed</p>
+              <p className="mt-1">
+                Your order has been created, but payment has not been
+                confirmed yet. If you have already paid, please wait a
+                moment and refresh — payment confirmations are processed
+                asynchronously via the payment provider webhook.
+              </p>
+            </div>
+          )}
 
           <div className="mt-6 flex justify-center gap-3">
             <Link href="/products" className={buttonVariants({ size: "lg" })}>

@@ -7,7 +7,7 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --test --test-timeout=10000 --experimental-strip-types features/cart/cart-logic.test.ts features/checkout/checkout-logic.test.ts",
+    "test": "node --import ./scripts/test-register.mjs --test --test-timeout=10000 --experimental-strip-types features/cart/cart-logic.test.ts features/checkout/checkout-logic.test.ts features/payment/payment-logic.test.ts features/payment/payment-webhook.test.ts",
     "db:seed": "node prisma/seed.ts"
   },
   "dependencies": {

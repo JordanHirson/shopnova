@@ -3,13 +3,14 @@
  *
  * The client is NEVER trusted for price, inventory, subtotal, tax,
  * shipping, or total. All authoritative values are re-read from
- * PostgreSQL at order-creation time inside a single transaction.
+ * PostgreSQL. Order creation now happens only after a server-verified
+ * payment notification (see features/payment/actions.ts and
+ * lib/db/payments.ts); this module exposes the authoritative checkout
+ * summary and order lookup used by the UI.
  */
 "use server"
 
-import { revalidatePath } from "next/cache"
-import { createOrder, getOrderByOrderNumber } from "@/lib/db"
-import { checkoutSchema, type CheckoutFormValues } from "@/lib/validations/checkout"
+import { getOrderByOrderNumber } from "@/lib/db"
 import { cartStore } from "@/features/cart/cart-store"
 import { getShopperId } from "@/features/cart/session"
 import { getCartProduct } from "@/lib/db/cart"
@@ -75,47 +76,6 @@ export async function getCheckoutSummaryAction(): Promise<CheckoutSummary | null
   const total = calculateOrderTotal(subtotal, shipping, vat)
 
   return { items, subtotal, shipping, vat, total }
-}
-
-/** Result of placing an order. */
-export interface PlaceOrderResult {
-  orderNumber?: string
-  error?: string
-}
-
-/**
- * Validates checkout details, creates the order inside a transaction,
- * and clears the cart only after the order succeeds.
- */
-export async function placeOrderAction(
-  input: CheckoutFormValues
-): Promise<PlaceOrderResult> {
-  const parsed = checkoutSchema.safeParse(input)
-  if (!parsed.success) {
-    return {
-      error: parsed.error.issues[0]?.message ?? "Invalid checkout details.",
-    }
-  }
-
-  const shopperId = await getShopperId()
-  const cart = await cartStore.getCart(shopperId)
-  if (!cart || cart.items.length === 0) {
-    return { error: "Your cart is empty." }
-  }
-
-  try {
-    const result = await createOrder(cart.items, parsed.data)
-
-    // Clear the cart only after the order transaction succeeds.
-    await cartStore.deleteCart(shopperId)
-    revalidatePath("/", "layout")
-
-    return { orderNumber: result.orderNumber }
-  } catch (err) {
-    return {
-      error: err instanceof Error ? err.message : "Failed to place the order.",
-    }
-  }
 }
 
 /** Returns an order by its order number for the confirmation page. */

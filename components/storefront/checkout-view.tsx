@@ -2,13 +2,14 @@
  * ShopNova - Checkout view (client component).
  *
  * Collects contact + shipping details, shows an authoritative order
- * summary (re-read from PostgreSQL), and places the order through a
- * server action. The client never sends prices or stock.
+ * summary (re-read from PostgreSQL), and starts the hosted-payment flow
+ * through a server action. The client never sends prices or stock, and
+ * never receives or stores card data — the shopper is redirected to the
+ * gateway's hosted payment UI.
  */
 "use client"
 
 import Link from "next/link"
-import { useRouter } from "next/navigation"
 import { useEffect, useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -28,17 +29,16 @@ import { Input } from "@/components/ui/input"
 import { useCart } from "@/features/cart/cart-context"
 import {
   getCheckoutSummaryAction,
-  placeOrderAction,
   type CheckoutSummary,
 } from "@/features/checkout/actions"
+import { startCheckoutPaymentAction } from "@/features/payment/actions"
 import {
   checkoutSchema,
   type CheckoutFormValues,
 } from "@/lib/validations/checkout"
 
 export function CheckoutView() {
-  const router = useRouter()
-  const { cart, loading: cartLoading, refresh } = useCart()
+  const { cart, loading: cartLoading } = useCart()
   const { user, isLoaded: clerkLoaded } = useUser()
   const [summary, setSummary] = useState<CheckoutSummary | null>(null)
   const [summaryLoading, setSummaryLoading] = useState(true)
@@ -108,14 +108,16 @@ export function CheckoutView() {
   function handleSubmit(values: CheckoutFormValues) {
     setSubmitError(null)
     startTransition(async () => {
-      const result = await placeOrderAction(values)
+      const result = await startCheckoutPaymentAction(values)
       if (result.error) {
         setSubmitError(result.error)
         return
       }
-      if (result.orderNumber) {
-        await refresh()
-        router.push(`/checkout/success?orderNumber=${result.orderNumber}`)
+      if (result.redirectUrl) {
+        // External hosted payment page (Stripe/PayFast) or the local
+        // mock payment page (Test gateway). Use a full page navigation
+        // so the shopper leaves ShopNova for the gateway and returns.
+        window.location.href = result.redirectUrl
       }
     })
   }
@@ -378,11 +380,12 @@ export function CheckoutView() {
             onClick={form.handleSubmit(handleSubmit)}
           >
             {isPending ? <Loader2 className="animate-spin" /> : null}
-            {isPending ? "Placing Order..." : "Place Order"}
+            {isPending ? "Redirecting to payment..." : "Continue to Payment"}
           </Button>
           <p className="text-center text-xs text-muted-foreground">
-            Payment is not processed at this stage. You will be able to pay
-            once payment is enabled.
+            You will be redirected to our secure payment provider
+            (Stripe or PayFast). Card details are never handled by
+            ShopNova.
           </p>
           <Link
             href="/cart"

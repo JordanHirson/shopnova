@@ -28,7 +28,21 @@ Open [http://localhost:3000](http://localhost:3000).
 npm test
 ```
 
-Runs the cart and checkout business logic unit tests (VAT, shipping, order totals, inventory validation) using Node's native test runner.
+Runs the cart, checkout, and payment business logic + webhook verification unit tests using Node's native test runner. Covers VAT, shipping, order totals, inventory validation, payment provider selection, authoritative-amount guards, and Stripe/PayFast/Test webhook signature verification. No real payment credentials are required — provider adapters are tested with mock credentials and real signature math.
+
+A small loader shim (`scripts/test-register.mjs`) maps the `server-only` marker package to an empty module so payment provider modules can be imported by the test runner outside a React server context.
+
+## Payments
+
+ShopNova uses hosted payment UIs so raw card data never touches the server (PCI-DSS SAQ A scope).
+
+- **Stripe** — hosted Checkout Sessions for international orders. Webhook signature verified with `STRIPE_WEBHOOK_SECRET`.
+- **PayFast** — hosted form (sandbox/production) as the default for South African orders. ITN callback verified with `PAYFAST_PASSPHRASE`.
+- **Test gateway** — mock provider for local development and automated tests (registered only outside production).
+
+Orders are created only after a server-verified payment notification. Duplicate webhooks are idempotent. Payment amounts are derived from authoritative server-side values, never client-supplied totals.
+
+See `.env.example` for the required environment variables (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `PAYFAST_MERCHANT_ID`, `PAYFAST_MERCHANT_KEY`, `PAYFAST_PASSPHRASE`, `PAYFAST_TEST_MODE`, optional `TEST_PAYMENT_SECRET`). None are required to run the test suite or to use the local Test gateway.
 
 ## Database Setup
 
