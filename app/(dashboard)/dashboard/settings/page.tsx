@@ -1,7 +1,13 @@
 import { PageHeader } from "@/components/layout/page-header"
 import { Container } from "@/components/layout/container"
+import { requireAdminOrRedirect } from "@/lib/auth/admin"
 
-export default function SettingsPage() {
+export const dynamic = "force-dynamic"
+
+export default async function SettingsPage() {
+  // SECURITY: admin authorization happens server-side before any data load.
+  await requireAdminOrRedirect()
+
   return (
     <Container>
       <PageHeader

@@ -7,11 +7,13 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "test": "node --import ./scripts/test-register.mjs --test --test-timeout=10000 --experimental-strip-types features/cart/cart-logic.test.ts features/checkout/checkout-logic.test.ts features/payment/payment-logic.test.ts features/payment/payment-webhook.test.ts features/account/account-logic.test.ts",
-    "db:seed": "node prisma/seed.ts"
+    "test": "node --import ./scripts/test-register.mjs --test --test-timeout=10000 --experimental-strip-types features/cart/cart-logic.test.ts features/checkout/checkout-logic.test.ts features/payment/payment-logic.test.ts features/payment/payment-webhook.test.ts features/account/account-logic.test.ts features/admin/admin-logic.test.ts",
+    "db:seed": "node prisma/seed.ts",
+    "set-admin": "node --experimental-strip-types scripts/set-admin.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.6.0",
+    "@clerk/backend": "^3.15.0",
     "@clerk/nextjs": "^7.6.4",
     "@hookform/resolvers": "^5.5.7",
     "@prisma/adapter-pg": "^7.9.1",

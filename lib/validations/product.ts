@@ -34,6 +34,17 @@ export const productSchema = z.object({
     .optional()
     .nullable(),
   categoryId: z.string().min(1, "Category is required"),
+  imageUrl: z
+    .string()
+    .url("Image URL must be a valid URL")
+    .max(2048, "Image URL must be 2048 characters or less")
+    .optional()
+    .or(z.literal("")),
+  stock: z
+    .string()
+    .regex(/^\d+$/, "Stock must be a non-negative integer")
+    .optional()
+    .or(z.literal("")),
 })
 
 export type ProductFormValues = z.infer<typeof productSchema>

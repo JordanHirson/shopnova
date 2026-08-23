@@ -9,6 +9,8 @@ export interface ProductInput {
   compareAtPrice?: string | null
   sku?: string | null
   categoryId: string
+  imageUrl?: string | null
+  stock?: number | null
 }
 
 export interface ProductUpdateInput {
@@ -19,10 +21,15 @@ export interface ProductUpdateInput {
   compareAtPrice?: string | null
   sku?: string | null
   categoryId: string
+  imageUrl?: string | null
+  stock?: number | null
 }
 
 /**
  * Lists all products for the default store, ordered by name.
+ * Admin-facing: includes archived products and inventory so the dashboard can
+ * show stock levels and soft-deleted items. Storefront queries use the
+ * `*Storefront*` helpers which exclude archived products.
  */
 export async function listProducts() {
   const storeId = await getDefaultStoreId()
@@ -33,6 +40,8 @@ export async function listProducts() {
     orderBy: { name: "asc" },
     include: {
       category: { select: { id: true, name: true } },
+      inventory: { select: { id: true, quantity: true, lowStockThreshold: true } },
+      images: { orderBy: { sortOrder: "asc" }, take: 1 },
     },
   })
 }
@@ -48,20 +57,22 @@ export async function getProductById(id: string) {
     where: { id, storeId },
     include: {
       category: { select: { id: true, name: true } },
+      inventory: { select: { id: true, quantity: true, lowStockThreshold: true } },
     },
   })
 }
 
 /**
  * Returns a single product by slug for the default store.
- * Used by the public storefront.
+ * Used by the public storefront. Archived products are never surfaced to
+ * shoppers — they are retained only for historical order integrity.
  */
 export async function getProductBySlug(slug: string) {
   const storeId = await getDefaultStoreId()
   if (!storeId) return null
 
   return prisma.product.findFirst({
-    where: { slug, storeId },
+    where: { slug, storeId, archived: false },
     include: {
       category: { select: { id: true, name: true, slug: true } },
       images: { orderBy: { sortOrder: "asc" } },
@@ -71,14 +82,15 @@ export async function getProductBySlug(slug: string) {
 
 /**
  * Lists all products for the default store, including the first image.
- * Used by the public storefront product listing page.
+ * Used by the public storefront product listing page. Archived products are
+ * excluded so shoppers never see soft-deleted catalog items.
  */
 export async function listStorefrontProducts() {
   const storeId = await getDefaultStoreId()
   if (!storeId) return []
 
   return prisma.product.findMany({
-    where: { storeId },
+    where: { storeId, archived: false },
     orderBy: { name: "asc" },
     include: {
       category: { select: { id: true, name: true, slug: true } },
@@ -95,7 +107,7 @@ export async function listFeaturedProducts(limit = 8) {
   if (!storeId) return []
 
   return prisma.product.findMany({
-    where: { storeId },
+    where: { storeId, archived: false },
     orderBy: { createdAt: "desc" },
     take: limit,
     include: {
@@ -107,7 +119,7 @@ export async function listFeaturedProducts(limit = 8) {
 
 /**
  * Lists products belonging to a category by category slug.
- * Used by the public storefront category page.
+ * Used by the public storefront category page. Archived products are excluded.
  */
 export async function listProductsByCategory(categorySlug: string) {
   const storeId = await getDefaultStoreId()
@@ -116,6 +128,7 @@ export async function listProductsByCategory(categorySlug: string) {
   return prisma.product.findMany({
     where: {
       storeId,
+      archived: false,
       category: { slug: categorySlug },
     },
     orderBy: { name: "asc" },
@@ -135,6 +148,9 @@ export async function createProduct(input: ProductInput) {
     throw new Error("No store found. Create a store before adding products.")
   }
 
+  const imageUrl = input.imageUrl?.trim() || null
+  const stock = input.stock ?? null
+
   return prisma.product.create({
     data: {
       name: input.name,
@@ -145,6 +161,10 @@ export async function createProduct(input: ProductInput) {
       sku: input.sku ?? null,
       categoryId: input.categoryId,
       storeId,
+      images: imageUrl
+        ? { create: [{ url: imageUrl, sortOrder: 0 }] }
+        : undefined,
+      inventory: stock !== null ? { create: { quantity: stock } } : undefined,
     },
   })
 }
@@ -158,6 +178,14 @@ export async function updateProduct(id: string, input: ProductUpdateInput) {
     throw new Error("No store found.")
   }
 
+  const imageUrl = input.imageUrl?.trim() || null
+  const stock = input.stock ?? null
+
+  // Replace existing images if a new URL is provided.
+  if (imageUrl) {
+    await prisma.productImage.deleteMany({ where: { productId: id } })
+  }
+
   return prisma.product.update({
     where: { id },
     data: {
@@ -168,12 +196,30 @@ export async function updateProduct(id: string, input: ProductUpdateInput) {
       compareAtPrice: input.compareAtPrice ?? null,
       sku: input.sku ?? null,
       categoryId: input.categoryId,
+      images: imageUrl
+        ? { create: [{ url: imageUrl, sortOrder: 0 }] }
+        : undefined,
+      inventory:
+        stock !== null
+          ? {
+              upsert: {
+                create: { quantity: stock },
+                update: { quantity: stock },
+              },
+            }
+          : undefined,
     },
   })
 }
 
 /**
- * Deletes a product by id for the default store.
+ * Archives a product by id for the default store (soft delete).
+ *
+ * Products are referenced by `OrderItem` with `onDelete: Restrict`, so a hard
+ * delete would fail (and corrupt history) once a product has been ordered.
+ * Archiving sets `archived = true`: the product disappears from the storefront
+ * and cart but is retained so historical order records stay intact. The admin
+ * list still shows archived products so they can be inspected or restored.
  */
 export async function deleteProduct(id: string) {
   const storeId = await getDefaultStoreId()
@@ -181,7 +227,23 @@ export async function deleteProduct(id: string) {
     throw new Error("No store found.")
   }
 
-  return prisma.product.delete({
+  return prisma.product.update({
     where: { id },
+    data: { archived: true },
+  })
+}
+
+/**
+ * Restores an archived product (un-archives it) for the default store.
+ */
+export async function restoreProduct(id: string) {
+  const storeId = await getDefaultStoreId()
+  if (!storeId) {
+    throw new Error("No store found.")
+  }
+
+  return prisma.product.update({
+    where: { id },
+    data: { archived: false },
   })
 }

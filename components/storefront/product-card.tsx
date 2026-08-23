@@ -7,6 +7,7 @@ interface ProductCardProps {
     name: string
     slug: string
     price: { toString(): string }
+    compareAtPrice: { toString(): string } | null
     category: { name: string; slug: string }
     images: { url: string; alt: string | null }[]
   }
@@ -14,6 +15,12 @@ interface ProductCardProps {
 
 export function ProductCard({ product }: ProductCardProps) {
   const image = product.images[0]
+  const compareAt = product.compareAtPrice
+    ? Number(product.compareAtPrice)
+    : null
+  const currentPrice = Number(product.price.toString())
+  const hasSale =
+    compareAt !== null && !Number.isNaN(compareAt) && compareAt > currentPrice
 
   return (
     <Link
@@ -41,9 +48,16 @@ export function ProductCard({ product }: ProductCardProps) {
         <h3 className="font-medium text-foreground line-clamp-1">
           {product.name}
         </h3>
-        <p className="mt-auto pt-2 text-sm font-semibold text-foreground">
-          R {product.price.toString()}
-        </p>
+        <div className="mt-auto flex items-baseline gap-2 pt-2">
+          <p className="text-sm font-semibold text-foreground">
+            R {product.price.toString()}
+          </p>
+          {hasSale && (
+            <p className="text-xs text-muted-foreground line-through">
+              R {compareAt!.toFixed(2)}
+            </p>
+          )}
+        </div>
       </div>
     </Link>
   )

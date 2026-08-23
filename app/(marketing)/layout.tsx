@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { Container } from "@/components/layout/container"
 import { AccountButton } from "@/components/storefront/account-button"
+import { AdminLink } from "@/components/storefront/admin-link"
 import { CartButton } from "@/components/storefront/cart-button"
 import { CartProvider } from "@/features/cart/cart-context"
 import { Package } from "lucide-react"
@@ -60,6 +61,7 @@ export default function MarketingLayout({
             <div className="flex items-center gap-2">
               <CartButton />
               <AccountButton />
+              <AdminLink />
             </div>
           </Container>
         </header>

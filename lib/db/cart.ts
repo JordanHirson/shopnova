@@ -31,7 +31,7 @@ export async function getCartProduct(productId: string): Promise<CartProductData
   if (!storeId) return null
 
   const product = await prisma.product.findFirst({
-    where: { id: productId, storeId },
+    where: { id: productId, storeId, archived: false },
     include: {
       images: { orderBy: { sortOrder: "asc" }, take: 1 },
       inventory: true,

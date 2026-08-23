@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Plus, Pencil, Trash2 } from "lucide-react"
+import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -40,6 +40,7 @@ import {
   createProductAction,
   updateProductAction,
   deleteProductAction,
+  restoreProductAction,
   type ProductActionState,
 } from "./actions"
 
@@ -52,7 +53,10 @@ interface Product {
   compareAtPrice: { toString(): string } | null
   sku: string | null
   categoryId: string
+  archived: boolean
   category: { id: string; name: string }
+  images: { url: string }[]
+  inventory: { quantity: number } | null
 }
 
 interface Category {
@@ -84,6 +88,8 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
       compareAtPrice: product?.compareAtPrice ? product.compareAtPrice.toString() : "",
       sku: product?.sku ?? "",
       categoryId: product?.categoryId ?? "",
+      imageUrl: product?.images?.[0]?.url ?? "",
+      stock: product?.inventory ? String(product.inventory.quantity) : "",
     },
   })
 
@@ -199,6 +205,23 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
                   )}
                 />
               </div>
+              <FormField
+                control={form.control}
+                name="imageUrl"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Image URL</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="https://example.com/image.jpg"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -239,12 +262,38 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
                             ))}
                           </SelectContent>
                         </Select>
+                        {/* base-ui Select doesn't submit a native form value,
+                            so mirror the selected id into FormData manually. */}
+                        <input
+                          type="hidden"
+                          name="categoryId"
+                          value={field.value ?? ""}
+                        />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
                   )}
                 />
               </div>
+              <FormField
+                control={form.control}
+                name="stock"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Stock Quantity</FormLabel>
+                    <FormControl>
+                      <Input
+                        type="number"
+                        min="0"
+                        placeholder="e.g. 100"
+                        {...field}
+                        value={field.value ?? ""}
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
             </Form>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
@@ -287,9 +336,9 @@ export function DeleteProductButton({ product }: { product: Product }) {
       />
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Delete Product</DialogTitle>
+          <DialogTitle>Archive Product</DialogTitle>
           <DialogDescription>
-            {`Are you sure you want to delete "${product.name}"? This action cannot be undone.`}
+            {`Archive "${product.name}"? It will be hidden from the storefront and cart, but kept in the database so past orders stay intact. You can restore it later.`}
           </DialogDescription>
         </DialogHeader>
         <form action={handleDelete}>
@@ -297,11 +346,36 @@ export function DeleteProductButton({ product }: { product: Product }) {
           {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
           <DialogFooter>
             <Button type="submit" variant="destructive" disabled={isPending}>
-              {isPending ? "Deleting..." : "Delete"}
+              {isPending ? "Archiving..." : "Archive"}
             </Button>
           </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>
+  )
+}
+
+export function RestoreProductButton({ product }: { product: Product }) {
+  const [error, setError] = useState<string | undefined>()
+  const [isPending, startTransition] = useTransition()
+
+  function handleRestore(formData: FormData) {
+    setError(undefined)
+    startTransition(async () => {
+      const result = await restoreProductAction({} as ProductActionState, formData)
+      if (result.error) {
+        setError(result.error)
+      }
+    })
+  }
+
+  return (
+    <form action={handleRestore}>
+      <input type="hidden" name="id" value={product.id} />
+      <Button type="submit" variant="ghost" size="icon-sm" disabled={isPending}>
+        {isPending ? "..." : <RotateCcw />}
+      </Button>
+      {error && <p className="sr-only text-sm text-destructive">{error}</p>}
+    </form>
   )
 }

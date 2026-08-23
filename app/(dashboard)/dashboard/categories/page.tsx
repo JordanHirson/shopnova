@@ -9,11 +9,15 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { listCategories } from "@/lib/db"
+import { requireAdminOrRedirect } from "@/lib/auth/admin"
 import { CategoryForm, DeleteCategoryButton } from "./category-form"
 
 export const dynamic = "force-dynamic"
 
 export default async function CategoriesPage() {
+  // SECURITY: admin authorization happens server-side before any data load.
+  await requireAdminOrRedirect()
+
   const categories = await listCategories()
 
   return (

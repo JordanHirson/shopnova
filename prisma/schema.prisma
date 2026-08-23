@@ -85,6 +85,10 @@ model Product {
   compareAtPrice Decimal? @db.Decimal(10, 2)
   sku            String?  @db.VarChar(100)
 
+  /** Soft-delete flag. Archived products are hidden from the storefront but
+   *  retained so historical OrderItem references stay intact (onDelete: Restrict). */
+  archived       Boolean  @default(false)
+
   storeId    String   @db.Uuid
   store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)
   categoryId String   @db.Uuid
@@ -101,6 +105,7 @@ model Product {
   @@unique([storeId, sku])
   @@index([storeId])
   @@index([categoryId])
+  @@index([archived])
   @@map("products")
 }
 

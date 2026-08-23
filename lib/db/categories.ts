@@ -94,11 +94,28 @@ export async function updateCategory(id: string, input: CategoryUpdateInput) {
 
 /**
  * Deletes a category by id for the default store.
+ *
+ * Products reference their category with `onDelete: Restrict`, so deleting a
+ * category that still has products would either fail at the database layer or
+ * silently orphan those products. This helper pre-checks the product count and
+ * throws a clear, actionable error before attempting the delete, so the admin
+ * is told to move/reassign products first rather than seeing a raw FK error.
  */
 export async function deleteCategory(id: string) {
   const storeId = await getDefaultStoreId()
   if (!storeId) {
     throw new Error("No store found.")
+  }
+
+  const productCount = await prisma.product.count({
+    where: { categoryId: id },
+  })
+
+  if (productCount > 0) {
+    throw new Error(
+      `Cannot delete a category that still has ${productCount} product(s). ` +
+        "Reassign or archive those products first."
+    )
   }
 
   return prisma.category.delete({

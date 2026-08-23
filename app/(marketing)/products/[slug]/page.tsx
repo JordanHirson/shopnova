@@ -25,6 +25,11 @@ export default async function ProductDetailsPage({
   const cartProduct = await getCartProduct(product.id)
   const availableQuantity = cartProduct?.quantityAvailable ?? 0
   const displayPrice = cartProduct?.price ?? Number(product.price)
+  const compareAt = product.compareAtPrice
+    ? Number(product.compareAtPrice)
+    : null
+  const hasSale =
+    compareAt !== null && !Number.isNaN(compareAt) && compareAt > displayPrice
 
   const image = product.images[0]
 
@@ -67,9 +72,16 @@ export default async function ProductDetailsPage({
             <h1 className="text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
               {product.name}
             </h1>
-            <p className="text-2xl font-semibold text-foreground">
-              R {displayPrice.toFixed(2)}
-            </p>
+            <div className="flex items-baseline gap-3">
+              <p className="text-2xl font-semibold text-foreground">
+                R {displayPrice.toFixed(2)}
+              </p>
+              {hasSale && (
+                <p className="text-lg text-muted-foreground line-through">
+                  R {compareAt!.toFixed(2)}
+                </p>
+              )}
+            </div>
             {product.description && (
               <p className="text-muted-foreground whitespace-pre-line">
                 {product.description}

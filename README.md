@@ -28,7 +28,7 @@ Open [http://localhost:3000](http://localhost:3000).
 npm test
 ```
 
-Runs the cart, checkout, payment, and customer-account business logic + webhook verification unit tests using Node's native test runner. Covers VAT, shipping, order totals, inventory validation, payment provider selection, authoritative-amount guards, Stripe/PayFast/Test webhook signature verification, Clerk/customer association, and order-ownership authorization. No real payment credentials are required — provider adapters are tested with mock credentials and real signature math.
+Runs the cart, checkout, payment, customer-account, and admin business logic + webhook verification unit tests using Node's native test runner. Covers VAT, shipping, order totals, inventory validation, payment provider selection, authoritative-amount guards, Stripe/PayFast/Test webhook signature verification, Clerk/customer association, order-ownership authorization, admin role matching, and admin order-status rules (PENDING/REFUNDED rejected to preserve payment security). No real payment credentials are required — provider adapters are tested with mock credentials and real signature math.
 
 A small loader shim (`scripts/test-register.mjs`) maps the `server-only` marker package to an empty module so payment provider modules can be imported by the test runner outside a React server context.
 
@@ -51,6 +51,37 @@ Authenticated customers can view their account and order history at `/account`, 
 - **Clerk ↔ Customer link:** A nullable, unique `Customer.clerkUserId` column associates an authenticated Clerk user with their Customer row. The link is set during checkout when a signed-in shopper completes payment. Guest checkouts are not linked.
 - **Security:** Every order query is scoped server-side to the authenticated customer's id. A customer cannot retrieve another customer's order by changing an order number in the URL — foreign orders return `notFound()`, identical to missing ones.
 - **Auth checks:** In-page `redirect("/sign-in?redirect_url=...")` is used instead of middleware `auth.protect()` (deprecated in Clerk v7 under Next.js 16).
+
+## Admin Dashboard & Store Management
+
+The admin area lives at `/dashboard/*` and lets the store owner operate ShopNova without touching the database. It is protected server-side on every page and every server action — a normal customer cannot access or invoke admin functionality.
+
+### Granting admin access
+
+An admin is a Clerk user whose `privateMetadata.role === "admin"`. `privateMetadata` is server-only (not forgeable in the browser). Grant or revoke it with:
+
+```bash
+npm run set-admin -- <clerkUserId>            # grant admin
+npm run set-admin -- <clerkUserId> --remove   # revoke admin
+```
+
+This requires `CLERK_SECRET_KEY` in your `.env.local`. You can also set it via the Clerk Dashboard → Users → user → Private metadata → `{ "role": "admin" }`.
+
+### What's included
+
+- **Dashboard (`/dashboard`)** — KPI overview: products, categories, customers, orders, pending orders, low-stock count, and recent orders.
+- **Products (`/dashboard/products`)** — create, edit, archive (soft-delete), and restore products. Archiving hides a product from the storefront while keeping historical order records intact (`OrderItem` uses `onDelete: Restrict`).
+- **Categories (`/dashboard/categories`)** — create, edit, and delete categories. Deletion is blocked with a clear error when products still reference the category.
+- **Inventory (`/dashboard/inventory`)** — view stock levels and low-stock thresholds, update quantities and thresholds.
+- **Orders (`/dashboard/orders`, `/dashboard/orders/[orderNumber]`)** — view orders and order details, update fulfillment status. Payment status is read-only and stays webhook-driven — an admin UI action can never mark an order paid or refunded.
+- **Customers (`/dashboard/customers`, `/dashboard/customers/[customerId]`)** — view customers and their order history. No auth identifiers are exposed.
+
+### Security
+
+- Every admin page calls `requireAdminOrRedirect()`; every admin server action calls `requireAdmin()` before any data access or mutation.
+- Middleware provides a lightweight auth gate (redirect unauthenticated users to sign-in); role authorization happens in-page/server-action because `privateMetadata` is not in the JWT.
+- A signed-in non-admin who navigates to `/dashboard` is redirected to `/dashboard/unauthorized`.
+- The storefront "Admin" link is a UI convenience only (rendered for admins) — it is not the security boundary.
 
 ## Database Setup
 

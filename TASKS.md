@@ -83,7 +83,6 @@
 - [ ] Live courier API integration (Bob Go, Aramex, PUDO, Courier Guy) — abstraction in place
 - [ ] Yoco + Stitch payment gateways (abstraction supports adding them)
 - [ ] Redis cart store (configure REDIS_URL)
-- [ ] Order management
 - [ ] AI features
 
 ## Customer Accounts & Order History
@@ -101,3 +100,25 @@
 - [x] Storefront header: `AccountButton` (Sign in / Account link + Clerk `UserButton`)
 - [x] Unit tests for account logic (15 tests) — Clerk/customer association, order ownership, display name fallbacks
 - [x] Verification: `npx prisma validate`, `npx prisma db push`, `npm test` (71 tests), `npx tsc --noEmit`, `npx eslint .`, `npx next build`, manual dev-server route check
+
+## Admin Dashboard & Store Management
+
+- [x] Admin authorization via Clerk `privateMetadata.role === "admin"` (server-only, not forgeable in browser)
+- [x] `features/admin/admin-logic.ts` — pure auth helpers (`isAdminRole`, `assertAdminRole`, `roleFromMetadata`, order-status rules) + `AdminRequiredError`/`UnauthenticatedError`
+- [x] `lib/auth/admin.ts` — `requireAdmin()` (server actions), `requireAdminOrRedirect()` (pages), `getAdminContext()` (non-throwing, header link)
+- [x] Additive schema change: `Product.archived` (nullable-safe boolean, default false) for soft-delete
+- [x] Middleware: lightweight auth gate redirecting unauthenticated `/dashboard(.*)` to sign-in (role check stays in-page because privateMetadata is not in the JWT)
+- [x] Dashboard KPI overview (`/dashboard`) — total/active/archived products, categories, customers, orders, pending orders, low-stock count, recent orders
+- [x] Product management (`/dashboard/products`) — list, create, edit, archive (soft-delete), restore; SKU, price, compare-at price, description, category; archived badge + stock column
+- [x] Safe product deletion: archive (not hard delete) so `OrderItem` (onDelete: Restrict) historical references stay intact
+- [x] Category management (`/dashboard/categories`) — list, create, edit, delete with product-count pre-check (blocks deletion when products still reference the category)
+- [x] Inventory management (`/dashboard/inventory`) — list stock + thresholds, low-stock badges, update quantity and/or low-stock threshold via server action
+- [x] Order management (`/dashboard/orders` + `/dashboard/orders/[orderNumber]`) — list, detail (items, totals, customer, shipping, payment summary), fulfillment status update
+- [x] Payment security: admin can only set fulfillment statuses (CONFIRMED/PROCESSING/SHIPPED/DELIVERED/CANCELLED); PENDING and REFUNDED excluded so an admin UI action can never mark an order paid/refunded — payment state stays webhook-driven
+- [x] Customer management (`/dashboard/customers` + `/dashboard/customers/[customerId]`) — list with order count, detail with order history; no auth identifiers (clerkUserId) exposed
+- [x] Storefront admin link (`AdminLink` server component) — visible only to admins; UI convenience only, not the security boundary
+- [x] `scripts/set-admin.ts` — grant/revoke admin role via Clerk Backend API (`npm run set-admin -- <clerkUserId> [--remove]`)
+- [x] Storefront product/cart queries filter `archived: false` so soft-deleted products disappear from the storefront
+- [x] Server-side authorization on every admin page and every admin server action (product/category/inventory/order)
+- [x] Unit tests for admin logic (12 tests) — role matching, metadata extraction, assertAdminRole, order-status rules (PENDING/REFUNDED rejected)
+- [x] Verification: `npx prisma validate`, `npx prisma db push`, `npm test` (83 tests), `npx tsc --noEmit`, `npx eslint .`, `npx next build`, manual dev-server route check (unauthenticated `/dashboard*` → 307 redirect to sign-in; storefront 200)
