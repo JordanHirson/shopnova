@@ -126,7 +126,7 @@ A full audit of the implementation against the MVP requirements in `GUIDEBOOK.md
 - **Admin helpers documented as store-scoped but not scoped (defence in depth).** `updateProduct`/`deleteProduct`/`restoreProduct`, `updateCategory`/`deleteCategory`, and `listInventory` resolved the default store id and then ignored it; product create/update accepted any `categoryId`. Fixed by verifying row (and referenced category) ownership before mutating, matching the pattern already used by `updateInventory`. Single-store MVP, so this was not a live exposure.
 - **Storefront category counts included archived products (correctness).** `/categories` and the home page advertised counts that included soft-deleted items. Fixed; the admin categories page explicitly requests total counts so admin numbers stay accurate.
 - **UX (MVP-level).** The storefront nav was hidden below `md` with no mobile alternative, making Products/Categories/About/Pricing/Contact unreachable on a phone — a compact mobile menu was added. The admin topbar's non-functional "Search..." box was removed (admin search is not in MVP scope).
-- **Tests:** 7 new pure-logic tests — the mock-payment gate (production, non-test provider, foreign shopper, intended local case), the currency guard (case-insensitive match, mismatch), and archived cart lines excluded from subtotal/item count. Total test suite: **118 tests**.
+- **Tests:** 7 new pure-logic tests — the mock-payment gate (production, non-test provider, foreign shopper, intended local case), the currency guard (case-insensitive match, mismatch), and archived cart lines excluded from subtotal/item count. Total test suite: **119 tests**.
 
 ### Verified as already correct (no change needed)
 
