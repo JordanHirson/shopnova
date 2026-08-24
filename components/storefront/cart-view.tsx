@@ -19,6 +19,7 @@ import {
 } from "@/features/cart/actions"
 import { useCart } from "@/features/cart/cart-context"
 import { getCartSubtotal } from "@/features/cart/cart-logic"
+import { cn } from "@/lib/utils"
 
 export function CartView() {
   const { cart, loading, error, refresh } = useCart()
@@ -94,9 +95,10 @@ export function CartView() {
         {cart.items.map((item) => (
           <div
             key={item.productId}
-            className={`flex gap-4 rounded-lg border p-4 ${
-              item.archived ? "opacity-75" : ""
-            }`}
+            className={cn(
+              "flex gap-4 rounded-lg border p-4",
+              item.archived && "opacity-75"
+            )}
           >
             <Link
               href={`/products/${item.slug}`}
