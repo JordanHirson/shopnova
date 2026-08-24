@@ -28,7 +28,7 @@ Open [http://localhost:3000](http://localhost:3000).
 npm test
 ```
 
-Runs the cart, checkout, payment, customer-account, and admin business logic + webhook verification unit tests using Node's native test runner. Covers VAT, shipping, order totals, inventory validation, payment provider selection, authoritative-amount guards, Stripe/PayFast/Test webhook signature verification, Clerk/customer association, order-ownership authorization, admin role matching, and admin order-status rules (PENDING/REFUNDED rejected to preserve payment security). No real payment credentials are required — provider adapters are tested with mock credentials and real signature math.
+Runs the cart, checkout, payment, customer-account, admin, and product-search business logic + webhook verification unit tests using Node's native test runner (111 tests). Covers VAT, shipping, order totals, inventory validation, payment provider selection, authoritative-amount guards, Stripe/PayFast/Test webhook signature verification, Clerk/customer association, order-ownership authorization, admin role matching, admin order-status rules (PENDING/REFUNDED rejected to preserve payment security), and storefront product search (name/description/sku/category matching, case-insensitive, partial matches, archived exclusion, empty/invalid queries, ordering, limits). No real payment credentials are required — provider adapters are tested with mock credentials and real signature math.
 
 A small loader shim (`scripts/test-register.mjs`) maps the `server-only` marker package to an empty module so payment provider modules can be imported by the test runner outside a React server context.
 
@@ -82,6 +82,22 @@ This requires `CLERK_SECRET_KEY` in your `.env.local`. You can also set it via t
 - Middleware provides a lightweight auth gate (redirect unauthenticated users to sign-in); role authorization happens in-page/server-action because `privateMetadata` is not in the JWT.
 - A signed-in non-admin who navigates to `/dashboard` is redirected to `/dashboard/unauthorized`.
 - The storefront "Admin" link is a UI convenience only (rendered for admins) — it is not the security boundary.
+
+## Product Search
+
+Shoppers can search the storefront product catalog from a search box in the storefront header. Search results live at `/products?search=<query>` and are URL-addressable (bookmarkable/shareable).
+
+- **What's searched:** product name, description, SKU, and category name — case-insensitive, partial/substring matching.
+- **Where it runs:** filtering is performed by PostgreSQL via Prisma (`ILIKE` substring match). The full catalog is never shipped to the browser. Queries are parameterized (no raw SQL).
+- **Archived products:** never returned by search (the same `archived: false` filter used by all storefront queries).
+- **Results:** ordered by name ascending, capped at 24 results. Reuses the existing product card grid. Shows a "no matches" empty state when nothing matches.
+- **Empty/invalid query:** a missing, blank, or over-long `search` param falls back to browsing all products rather than showing a zero-result search.
+- **Search UI:** a small form in the storefront header (`components/storefront/search-box.tsx`) with an accessible label and `role="search"`, working on desktop and mobile.
+- **Search contract:** the matching behavior is defined in a pure, unit-tested module (`features/search/search-logic.ts`) that the database query mirrors, so the search semantics are verified without needing a live database.
+
+### Advanced search (post-MVP roadmap)
+
+The following are deliberately deferred and not part of the MVP: PostgreSQL full-text search (`tsvector`/`tsquery` + GIN indexes), trigram indexes (`pg_trgm`) for fuzzy/typo-tolerant matching, pgvector semantic/vector search, AI/LLM search, embeddings, personalized search, and catalog federation search. The current `ILIKE` substring implementation is fast and sufficient for the MVP catalog size.
 
 ## Database Setup
 

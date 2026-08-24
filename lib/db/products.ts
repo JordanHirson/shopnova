@@ -1,5 +1,10 @@
 import { prisma } from "./prisma"
 import { getDefaultStoreId } from "./store"
+import {
+  DEFAULT_SEARCH_LIMIT,
+  clampSearchLimit,
+  getSearchTerm,
+} from "@/features/search/search-logic"
 
 export interface ProductInput {
   name: string
@@ -132,6 +137,58 @@ export async function listProductsByCategory(categorySlug: string) {
       category: { slug: categorySlug },
     },
     orderBy: { name: "asc" },
+    include: {
+      category: { select: { id: true, name: true, slug: true } },
+      images: { orderBy: { sortOrder: "asc" }, take: 1 },
+    },
+  })
+}
+
+/**
+ * Searches the storefront product catalog for the default store.
+ *
+ * Search contract (mirrors the pure reference implementation in
+ * `features/search/search-logic.ts`):
+ *   - case-insensitive substring (`contains`) matching,
+ *   - across product `name`, `description`, `sku`, and category `name`,
+ *   - archived products are NEVER returned,
+ *   - results ordered by name ascending (stable, predictable),
+ *   - result count clamped to `DEFAULT_SEARCH_LIMIT` to prevent excessive
+ *     queries on a small catalog.
+ *
+ * Filtering is performed by PostgreSQL via Prisma — the entire catalog is
+ * never loaded into the application. Returns an empty array when the query
+ * is missing/blank/invalid (the caller should then browse all products
+ * rather than treat this as a zero-result search).
+ *
+ * Future optimization (post-MVP): PostgreSQL full-text search (`tsvector` +
+ * `tsquery` with `websearch_to_tsquery`), trigram indexes (`pg_trgm`) for
+ * fuzzy/typo-tolerant matching, or pgvector semantic search. Not needed
+ * for the current catalog size.
+ */
+export async function searchStorefrontProducts(
+  rawQuery: string | null | undefined,
+  limit: number | null | undefined = DEFAULT_SEARCH_LIMIT
+) {
+  const term = getSearchTerm(rawQuery)
+  if (!term) return []
+
+  const storeId = await getDefaultStoreId()
+  if (!storeId) return []
+
+  return prisma.product.findMany({
+    where: {
+      storeId,
+      archived: false,
+      OR: [
+        { name: { contains: term, mode: "insensitive" } },
+        { description: { contains: term, mode: "insensitive" } },
+        { sku: { contains: term, mode: "insensitive" } },
+        { category: { name: { contains: term, mode: "insensitive" } } },
+      ],
+    },
+    orderBy: { name: "asc" },
+    take: clampSearchLimit(limit),
     include: {
       category: { select: { id: true, name: true, slug: true } },
       images: { orderBy: { sortOrder: "asc" }, take: 1 },

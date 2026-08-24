@@ -78,6 +78,19 @@
 - [x] Unit tests for webhook verification (15 tests) — valid/invalid/missing signatures, failed payments, ignored events, PayFast MD5 stability
 - [x] Test runner loader shim for `server-only` (`scripts/test-register.mjs` + `test-loader.mjs`)
 
+## Product Search
+
+- [x] Pure search logic module (`features/search/search-logic.ts`) — query normalization/validation, case-insensitive substring matcher, pure reference `searchProducts` implementation, limit clamping
+- [x] `searchStorefrontProducts` DB query (`lib/db/products.ts`) — PostgreSQL `ILIKE` substring matching across product name, description, sku, and category name; `archived: false` always applied; results ordered by name asc; clamped to 24 results
+- [x] URL-addressable search results at `/products?search=<query>` (bookmarkable/shareable; search state lives in the URL, not ephemeral client state)
+- [x] `/products` page handles: valid search → results, empty/missing search → browse all, no matches → empty state, invalid/over-long query → browse all
+- [x] `SearchBox` client component in storefront header (`components/storefront/search-box.tsx`) — GET form submitting to `/products?search=...`, accessible label (`sr-only` + `aria-label`), `role="search"`, seeds input from URL, works on desktop and mobile
+- [x] Header layout updated to include the search box (wrapped in `Suspense` for `useSearchParams`); nav links hidden on mobile to make room for search
+- [x] Archived products never returned by search (DB filter + pure matcher)
+- [x] Server-side filtering only — full catalog never shipped to the browser; parameterized Prisma queries (no raw SQL, no SQL injection)
+- [x] Unit tests for search logic (28 tests) — name/description/sku/category matching, case-insensitive, partial/substring, no results, archived excluded, empty/invalid query, ordering, limit clamping, null fields
+- [x] Verification: `npx prisma validate`, `npm test` (111 tests), `npx tsc --noEmit`, `npx eslint .` (0 errors), `npx next build`, manual dev-server route check (home/products/search variants/category/product detail/cart all 200; admin routes 307 redirect)
+
 ## MVP Features (Future)
 
 - [ ] Live courier API integration (Bob Go, Aramex, PUDO, Courier Guy) — abstraction in place
