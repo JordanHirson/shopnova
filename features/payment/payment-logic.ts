@@ -85,7 +85,7 @@ export function isTestPaymentAllowed(
   nodeEnv: string | undefined,
   intentProvider: string,
   intentShopperId: string,
-  currentShopperId: string
+  currentShopperId: string | null | undefined
 ): boolean {
   return (
     nodeEnv !== "production" &&

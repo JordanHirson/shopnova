@@ -23,15 +23,24 @@ const ANON_COOKIE_MAX_AGE = 60 * 60 * 24 * 30 // 30 days
  * Creates the anonymous cookie on first visit when the shopper is not
  * signed in.
  */
-export async function getShopperId(): Promise<string> {
+export async function getExistingShopperId(): Promise<string | null> {
   const { userId } = await auth()
   if (userId) return `user:${userId}`
 
   const cookieStore = await cookies()
   const existing = cookieStore.get(ANON_COOKIE_NAME)?.value
-  if (existing) return `anon:${existing}`
+  return existing ? `anon:${existing}` : null
+}
+
+/**
+ * Returns a stable shopper id, creating the anonymous cookie when needed.
+ */
+export async function getShopperId(): Promise<string> {
+  const existingShopperId = await getExistingShopperId()
+  if (existingShopperId) return existingShopperId
 
   const id = randomUUID()
+  const cookieStore = await cookies()
   cookieStore.set(ANON_COOKIE_NAME, id, {
     httpOnly: true,
     sameSite: "lax",

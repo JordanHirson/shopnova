@@ -2,7 +2,7 @@ import { notFound } from "next/navigation"
 import { Container } from "@/components/layout/container"
 import { getIntentById } from "@/lib/db"
 import { TestPayView } from "@/components/storefront/test-pay-view"
-import { getShopperId } from "@/features/cart/session"
+import { getExistingShopperId } from "@/features/cart/session"
 import { isTestPaymentAllowed } from "@/features/payment/payment-logic"
 
 export const dynamic = "force-dynamic"
@@ -15,8 +15,10 @@ export default async function TestPayPage({ searchParams }: TestPayPageProps) {
   const { intentId } = await searchParams
   if (!intentId) notFound()
 
+  const shopperId = await getExistingShopperId()
+  if (!shopperId) notFound()
+
   const intent = await getIntentById(intentId)
-  const shopperId = await getShopperId()
   if (
     !intent ||
     !isTestPaymentAllowed(

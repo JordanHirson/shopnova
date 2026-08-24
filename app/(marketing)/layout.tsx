@@ -4,9 +4,10 @@ import { Container } from "@/components/layout/container"
 import { AccountButton } from "@/components/storefront/account-button"
 import { AdminLink } from "@/components/storefront/admin-link"
 import { CartButton } from "@/components/storefront/cart-button"
+import { MobileNav } from "@/components/storefront/mobile-nav"
 import { SearchBox } from "@/components/storefront/search-box"
 import { CartProvider } from "@/features/cart/cart-context"
-import { Menu, Package } from "lucide-react"
+import { Package } from "lucide-react"
 
 export default function MarketingLayout({
   children,
@@ -17,8 +18,11 @@ export default function MarketingLayout({
     <CartProvider>
       <div className="flex min-h-screen flex-col">
         <header className="border-b">
-          <Container className="flex h-14 items-center justify-between gap-4">
-            <Link href="/" className="flex items-center gap-2 font-semibold">
+          <Container className="flex min-w-0 h-14 items-center justify-between gap-4">
+            <Link
+              href="/"
+              className="flex shrink-0 items-center gap-2 font-semibold"
+            >
               <Package className="h-5 w-5" />
               <span>ShopNova</span>
             </Link>
@@ -60,51 +64,8 @@ export default function MarketingLayout({
                 Contact
               </Link>
             </nav>
-            <div className="flex flex-1 items-center justify-end gap-2 md:flex-none">
-              <details className="relative md:hidden">
-                <summary className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground [&::-webkit-details-marker]:hidden">
-                  <Menu className="h-5 w-5" />
-                  <span className="sr-only">Open navigation</span>
-                </summary>
-                <nav className="absolute right-0 top-full z-50 mt-2 flex w-48 flex-col gap-1 rounded-lg border bg-background p-2 text-sm font-medium shadow-md">
-                  <Link
-                    href="/"
-                    className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    Home
-                  </Link>
-                  <Link
-                    href="/products"
-                    className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    Products
-                  </Link>
-                  <Link
-                    href="/categories"
-                    className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    Categories
-                  </Link>
-                  <Link
-                    href="/about"
-                    className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    About
-                  </Link>
-                  <Link
-                    href="/pricing"
-                    className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    Pricing
-                  </Link>
-                  <Link
-                    href="/contact"
-                    className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
-                  >
-                    Contact
-                  </Link>
-                </nav>
-              </details>
+            <div className="flex min-w-0 flex-1 items-center justify-end gap-1 md:flex-none md:gap-2">
+              <MobileNav />
               <Suspense fallback={null}>
                 <SearchBox />
               </Suspense>

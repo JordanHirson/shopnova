@@ -80,6 +80,10 @@ test("isTestPaymentAllowed rejects a foreign shopper", () => {
   assert.equal(isTestPaymentAllowed("development", "test", "anon-1", "anon-2"), false)
 })
 
+test("isTestPaymentAllowed rejects a missing shopper identity", () => {
+  assert.equal(isTestPaymentAllowed("development", "test", "anon-1", null), false)
+})
+
 // ── Provider selection ─────────────────────────
 
 test("South Africa routes to PayFast by default", () => {
