@@ -45,7 +45,7 @@ export function calculateLineTotal(
 /** Subtotal (sum of line totals) computed in cents. */
 export function getCartSubtotal(cart: Cart): number {
   const totalCents = cart.items.reduce(
-    (sum, item) => sum + toCents(item.lineTotal),
+    (sum, item) => sum + (item.archived ? 0 : toCents(item.lineTotal)),
     0
   )
   return fromCents(totalCents)
@@ -53,7 +53,10 @@ export function getCartSubtotal(cart: Cart): number {
 
 /** Total number of units across all cart lines. */
 export function getCartItemCount(cart: Cart): number {
-  return cart.items.reduce((sum, item) => sum + item.quantity, 0)
+  return cart.items.reduce(
+    (sum, item) => sum + (item.archived ? 0 : item.quantity),
+    0
+  )
 }
 
 function withTimestamp(items: CartItem[]): Cart {

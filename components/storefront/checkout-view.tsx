@@ -45,6 +45,7 @@ export function CheckoutView() {
   const [summaryError, setSummaryError] = useState<string | null>(null)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
+  const hasUnavailableItems = cart.items.some((item) => item.archived)
 
   const form = useForm<CheckoutFormValues>({
     resolver: zodResolver(checkoutSchema),
@@ -301,6 +302,12 @@ export function CheckoutView() {
 
           {submitError && (
             <p className="text-sm font-medium text-destructive">{submitError}</p>
+          )}
+          {hasUnavailableItems && (
+            <p className="text-sm font-medium text-destructive">
+              An item in your cart is no longer available. Return to your cart
+              and remove it before checking out.
+            </p>
           )}
         </form>
       </Form>

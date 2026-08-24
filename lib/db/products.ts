@@ -205,6 +205,14 @@ export async function createProduct(input: ProductInput) {
     throw new Error("No store found. Create a store before adding products.")
   }
 
+  const category = await prisma.category.findFirst({
+    where: { id: input.categoryId, storeId },
+    select: { id: true },
+  })
+  if (!category) {
+    throw new Error("Category not found.")
+  }
+
   const imageUrl = input.imageUrl?.trim() || null
   const stock = input.stock ?? null
 
@@ -233,6 +241,22 @@ export async function updateProduct(id: string, input: ProductUpdateInput) {
   const storeId = await getDefaultStoreId()
   if (!storeId) {
     throw new Error("No store found.")
+  }
+
+  const product = await prisma.product.findFirst({
+    where: { id, storeId },
+    select: { id: true },
+  })
+  if (!product) {
+    throw new Error("Product not found.")
+  }
+
+  const category = await prisma.category.findFirst({
+    where: { id: input.categoryId, storeId },
+    select: { id: true },
+  })
+  if (!category) {
+    throw new Error("Category not found.")
   }
 
   const imageUrl = input.imageUrl?.trim() || null
@@ -284,6 +308,14 @@ export async function deleteProduct(id: string) {
     throw new Error("No store found.")
   }
 
+  const product = await prisma.product.findFirst({
+    where: { id, storeId },
+    select: { id: true },
+  })
+  if (!product) {
+    throw new Error("Product not found.")
+  }
+
   return prisma.product.update({
     where: { id },
     data: { archived: true },
@@ -297,6 +329,14 @@ export async function restoreProduct(id: string) {
   const storeId = await getDefaultStoreId()
   if (!storeId) {
     throw new Error("No store found.")
+  }
+
+  const product = await prisma.product.findFirst({
+    where: { id, storeId },
+    select: { id: true },
+  })
+  if (!product) {
+    throw new Error("Product not found.")
   }
 
   return prisma.product.update({

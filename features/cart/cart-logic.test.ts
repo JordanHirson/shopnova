@@ -105,6 +105,24 @@ test("subtotal sums line totals", () => {
   assert.equal(getCartSubtotal(cart), 35)
 })
 
+test("archived items are excluded from subtotal and item count", () => {
+  let cart = createEmptyCart()
+  cart = addItemToCart(cart, makeItem({ quantity: 2 })).cart
+  cart = addItemToCart(
+    cart,
+    makeItem({
+      productId: "p2",
+      name: "Archived gadget",
+      slug: "archived-gadget",
+      unitPrice: 5,
+      quantity: 3,
+      archived: true,
+    })
+  ).cart
+  assert.equal(getCartSubtotal(cart), 20)
+  assert.equal(getCartItemCount(cart), 2)
+})
+
 test("quantity cannot become zero or negative", () => {
   let cart = createEmptyCart()
   cart = addItemToCart(cart, makeItem()).cart

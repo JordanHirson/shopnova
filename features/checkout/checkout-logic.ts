@@ -88,7 +88,10 @@ export function validateOrderQuantities(
 
     const available = availableByProduct.get(item.productId)
     if (available === undefined) {
-      return "A product in your cart is no longer available."
+      return (
+        "A product in your cart is no longer available. " +
+        "Remove it from your cart before checking out."
+      )
     }
 
     if (item.quantity > available) {

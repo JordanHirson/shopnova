@@ -6,7 +6,7 @@ import { AdminLink } from "@/components/storefront/admin-link"
 import { CartButton } from "@/components/storefront/cart-button"
 import { SearchBox } from "@/components/storefront/search-box"
 import { CartProvider } from "@/features/cart/cart-context"
-import { Package } from "lucide-react"
+import { Menu, Package } from "lucide-react"
 
 export default function MarketingLayout({
   children,
@@ -61,6 +61,50 @@ export default function MarketingLayout({
               </Link>
             </nav>
             <div className="flex flex-1 items-center justify-end gap-2 md:flex-none">
+              <details className="relative md:hidden">
+                <summary className="flex h-9 w-9 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground [&::-webkit-details-marker]:hidden">
+                  <Menu className="h-5 w-5" />
+                  <span className="sr-only">Open navigation</span>
+                </summary>
+                <nav className="absolute right-0 top-full z-50 mt-2 flex w-48 flex-col gap-1 rounded-lg border bg-background p-2 text-sm font-medium shadow-md">
+                  <Link
+                    href="/"
+                    className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    Home
+                  </Link>
+                  <Link
+                    href="/products"
+                    className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    Products
+                  </Link>
+                  <Link
+                    href="/categories"
+                    className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    Categories
+                  </Link>
+                  <Link
+                    href="/about"
+                    className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    About
+                  </Link>
+                  <Link
+                    href="/pricing"
+                    className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    Pricing
+                  </Link>
+                  <Link
+                    href="/contact"
+                    className="rounded-md px-3 py-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    Contact
+                  </Link>
+                </nav>
+              </details>
               <Suspense fallback={null}>
                 <SearchBox />
               </Suspense>

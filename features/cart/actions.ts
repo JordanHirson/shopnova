@@ -14,7 +14,7 @@
 "use server"
 
 import { revalidatePath } from "next/cache"
-import { getCartProduct } from "@/lib/db"
+import { getCartProduct, getCartProductStatuses } from "@/lib/db"
 import type {
   Cart,
   CartActionResult,
@@ -38,7 +38,16 @@ async function loadCart(shopperId: string): Promise<Cart> {
 export async function getCartAction(): Promise<Cart> {
   const shopperId = await getShopperId()
   const cart = await loadCart(shopperId)
-  return cart
+  const archivedByProduct = await getCartProductStatuses(
+    cart.items.map((item) => item.productId)
+  )
+  return {
+    ...cart,
+    items: cart.items.map((item) => ({
+      ...item,
+      archived: archivedByProduct.get(item.productId) ?? item.archived ?? false,
+    })),
+  }
 }
 
 /** Adds a product to the cart. */
@@ -67,6 +76,7 @@ export async function addToCartAction(
       imageUrl: product.imageUrl,
       unitPrice: product.price,
       quantity,
+      archived: product.archived,
     },
     product.quantityAvailable
   )

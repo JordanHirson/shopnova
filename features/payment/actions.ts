@@ -34,7 +34,11 @@ import {
   type PaymentCompletionResult,
 } from "@/lib/db"
 import { getProvider } from "./provider-registry"
-import { selectProviderForCountry, toAmountCents } from "./payment-logic"
+import {
+  isTestPaymentAllowed,
+  selectProviderForCountry,
+  toAmountCents,
+} from "./payment-logic"
 import type { PaymentNotification, PaymentProviderId } from "./types"
 
 /** Result of starting a checkout payment. */
@@ -179,8 +183,17 @@ export async function completeTestPaymentAction(
   intentId: string,
   success: boolean
 ): Promise<CompleteTestPaymentResult> {
+  const shopperId = await getShopperId()
   const intent = await getIntentById(intentId)
-  if (!intent) {
+  if (
+    !intent ||
+    !isTestPaymentAllowed(
+      process.env.NODE_ENV,
+      intent.provider,
+      intent.shopperId,
+      shopperId
+    )
+  ) {
     return {
       result: { status: "not-found" },
     }

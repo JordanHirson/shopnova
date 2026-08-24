@@ -26,6 +26,7 @@ import {
 import type { PaymentNotification, PaymentProviderId } from "@/features/payment/types"
 import { cartStore } from "@/features/cart/cart-store"
 import { clerkUserIdFromShopperId } from "@/features/account/account-logic"
+import { amountMatches, currencyMatches } from "@/features/payment/payment-logic"
 
 /** A single product line stored on an intent (authoritative quantity snapshot). */
 export interface IntentLine {
@@ -74,7 +75,7 @@ export async function createCheckoutIntent(
   // Re-read authoritative product prices/inventory and compute the amount.
   const productIds = input.items.map((i) => i.productId)
   const products = await prisma.product.findMany({
-    where: { id: { in: productIds }, storeId },
+    where: { id: { in: productIds }, storeId, archived: false },
     include: { inventory: true },
   })
 
@@ -182,8 +183,10 @@ export async function completePaidIntent(
 
   // Authoritative amount guard: the gateway's verified charge must EXACTLY
   // match the server-computed intent amount (cents).
-  const serverAmountCents = Math.round(Number(intent.amount) * 100)
-  if (serverAmountCents !== notification.amountMinor) {
+  if (
+    !amountMatches(Number(intent.amount), notification.amountMinor) ||
+    !currencyMatches(intent.currency, notification.currency)
+  ) {
     return { status: "amount-mismatch" }
   }
 
@@ -213,7 +216,11 @@ export async function completePaidIntent(
     // 1. Re-read authoritative products + inventory.
     const productIds = items.map((i) => i.productId)
     const products = await tx.product.findMany({
-      where: { id: { in: productIds }, storeId: intent.storeId },
+      where: {
+        id: { in: productIds },
+        storeId: intent.storeId,
+        archived: false,
+      },
       include: { inventory: true },
     })
     const productById = new Map(products.map((p) => [p.id, p]))
