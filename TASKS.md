@@ -150,9 +150,11 @@ Audit of the implemented MVP against `GUIDEBOOK.md` — customer journey, admin 
 - [x] Cart marks archived lines unavailable and excludes them from the subtotal and header item count
 - [x] Admin mutations verify default-store ownership before writing (products, categories, referenced category on product create/update); `listInventory` scoped to store products
 - [x] Storefront category product counts exclude archived products (admin counts stay total)
-- [x] Mobile storefront navigation added (nav links were unreachable below `md`)
+- [x] Mobile storefront navigation added (nav links were unreachable below `md`) — closes after navigation, panel pinned inside the viewport, header search collapses to an icon below `sm` so there is no horizontal overflow at 390px
+- [x] Test-payment gate resolves identity read-only (`getExistingShopperId`) so a first-ever visitor with no cart cookie is denied with a 404 instead of crashing (a Server Component cannot set cookies)
 - [x] Removed the non-functional "Search..." box from the admin topbar
-- [x] Unit tests for the new pure guards (7 tests): mock-payment gate (production / non-test provider / foreign shopper / intended local case), currency guard (match + mismatch), archived cart lines excluded from totals
+- [x] Unit tests for the new pure guards (8 tests): mock-payment gate (production / non-test provider / foreign shopper / missing identity / intended local case), currency guard (match + mismatch), archived cart lines excluded from totals
+- [x] Runtime browser verification of the storefront journey against seeded PostgreSQL: browse/search, cart, checkout arithmetic, mock-gateway pay and decline paths (order/order items/price snapshots/`SUCCEEDED` payment/inventory decrement confirmed in the database; decline creates no order), archived-product guard, ownership gate, 390px layout
 - [x] Verification: `npx prisma validate`, `npx tsc --noEmit`, `npm test` (119 tests), `npx eslint .` (0 errors, 3 pre-existing warnings), `npx next build`, dev-server route checks
 
 Audited and found already correct (no change made): verified-webhook-only order creation, webhook idempotency, failed-payment handling, payment-vs-fulfillment status separation, customer order-ownership scoping, admin authorization on every page and server action, Clerk `privateMetadata` role model, server-side Zod validation, no hard-coded secrets, `.env*` gitignored, schema relationships/constraints/`onDelete` behavior. No schema change was required.
