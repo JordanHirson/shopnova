@@ -46,7 +46,7 @@
 - [x] Order number generation (SN-YYYYMMDD-XXXXXX, not DB id)
 - [x] Cart clears only after successful order creation
 - [x] Insufficient inventory prevents order creation (no partial order)
-- [x] Order confirmation page (/checkout/success) — PENDING, not paid
+- [x] Order confirmation page (/checkout/success) — shows CONFIRMED (paid) vs not-yet-confirmed payment state
 - [x] Unit tests for VAT, shipping, subtotal, total, quantity, order number (17 tests)
 
 ## Payment Architecture & Integration (Sprint 3, Part 3)
@@ -91,12 +91,16 @@
 - [x] Unit tests for search logic (28 tests) — name/description/sku/category matching, case-insensitive, partial/substring, no results, archived excluded, empty/invalid query, ordering, limit clamping, null fields
 - [x] Verification: `npx prisma validate`, `npm test` (111 tests), `npx tsc --noEmit`, `npx eslint .` (0 errors), `npx next build`, manual dev-server route check (home/products/search variants/category/product detail/cart all 200; admin routes 307 redirect)
 
-## MVP Features (Future)
+## Post-MVP Roadmap (deferred — NOT required to finish the MVP)
 
-- [ ] Live courier API integration (Bob Go, Aramex, PUDO, Courier Guy) — abstraction in place
-- [ ] Yoco + Stitch payment gateways (abstraction supports adding them)
-- [ ] Redis cart store (configure REDIS_URL)
-- [ ] AI features
+- [ ] Live courier API integration (Bob Go, Aramex, PUDO, Courier Guy) — `ShippingProvider` seam in place
+- [ ] Additional payment gateways: Yoco, Stitch (provider abstraction supports them)
+- [ ] Redis cart store (configure `REDIS_URL` and swap the `CartStore` singleton)
+- [ ] AI/LLM features and agents
+- [ ] pgvector semantic/vector search; PostgreSQL full-text (`tsvector`) and trigram (`pg_trgm`) search
+- [ ] Product federation / marketplace integrations (Shopify, Amazon, Takealot, AliExpress)
+- [ ] Advanced analytics and marketing automation
+- [ ] Admin search
 
 ## Customer Accounts & Order History
 
@@ -135,3 +139,29 @@
 - [x] Server-side authorization on every admin page and every admin server action (product/category/inventory/order)
 - [x] Unit tests for admin logic (12 tests) — role matching, metadata extraction, assertAdminRole, order-status rules (PENDING/REFUNDED rejected)
 - [x] Verification: `npx prisma validate`, `npx prisma db push`, `npm test` (83 tests), `npx tsc --noEmit`, `npx eslint .`, `npx next build`, manual dev-server route check (unauthenticated `/dashboard*` → 307 redirect to sign-in; storefront 200)
+
+## Final MVP Audit (Sprint 7)
+
+Audit of the implemented MVP against `GUIDEBOOK.md` — customer journey, admin journey, security boundaries, data integrity, payment safety, responsive UX, tests.
+
+- [x] Mock Test-gateway completion locked down: `completeTestPaymentAction` and `/checkout/test-pay` now require non-production + `provider === "test"` + intent ownership (pure `isTestPaymentAllowed`). Previously a client could complete a real Stripe/PayFast intent for free, or complete/decline another shopper's intent.
+- [x] Authoritative-amount guard also compares currency (case-insensitive `currencyMatches`); a mismatch is rejected before any order/payment is created
+- [x] Archived products can no longer be ordered: both authoritative product loads in `lib/db/payments.ts` filter `archived: false`; checkout returns an actionable error instead of silently charging for an item the summary omitted
+- [x] Cart marks archived lines unavailable and excludes them from the subtotal and header item count
+- [x] Admin mutations verify default-store ownership before writing (products, categories, referenced category on product create/update); `listInventory` scoped to store products
+- [x] Storefront category product counts exclude archived products (admin counts stay total)
+- [x] Mobile storefront navigation added (nav links were unreachable below `md`)
+- [x] Removed the non-functional "Search..." box from the admin topbar
+- [x] Unit tests for the new pure guards (7 tests): mock-payment gate (production / non-test provider / foreign shopper / intended local case), currency guard (match + mismatch), archived cart lines excluded from totals
+- [x] Verification: `npx prisma validate`, `npx tsc --noEmit`, `npm test` (118 tests), `npx eslint .` (0 errors, 3 pre-existing warnings), `npx next build`, dev-server route checks
+
+Audited and found already correct (no change made): verified-webhook-only order creation, webhook idempotency, failed-payment handling, payment-vs-fulfillment status separation, customer order-ownership scoping, admin authorization on every page and server action, Clerk `privateMetadata` role model, server-side Zod validation, no hard-coded secrets, `.env*` gitignored, schema relationships/constraints/`onDelete` behavior. No schema change was required.
+
+## MVP Remaining
+
+No MVP requirement is known to be unimplemented. Genuine limitations of the current build (documented, not blockers):
+
+- [ ] In-memory cart store (`MemoryCartStore`); carts do not survive a restart and are not shared across instances
+- [ ] Stripe and PayFast are unit-tested against real signature math but have never been exercised against the live Stripe API / PayFast sandbox with real credentials
+- [ ] The authorized-admin journey (product/category/inventory/order mutations) has not been manually exercised with a live Clerk admin session — code paths are unit-tested and route protection was verified
+- [ ] Order numbers use a random 6-digit suffix with a unique constraint; a same-day collision surfaces as a checkout error rather than being retried
