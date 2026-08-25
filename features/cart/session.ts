@@ -19,19 +19,28 @@ const ANON_COOKIE_NAME = "shopnova_cart_id"
 const ANON_COOKIE_MAX_AGE = 60 * 60 * 24 * 30 // 30 days
 
 /**
- * Returns a stable shopper id used to key a cart in the cart store.
- * Creates the anonymous cookie on first visit when the shopper is not
- * signed in.
+ * Returns the shopper id already established for this request, or null when
+ * the shopper is anonymous and has no cart cookie yet. Never mints identity,
+ * so it is safe to call while rendering a Server Component.
  */
-export async function getShopperId(): Promise<string> {
+export async function getExistingShopperId(): Promise<string | null> {
   const { userId } = await auth()
   if (userId) return `user:${userId}`
 
   const cookieStore = await cookies()
   const existing = cookieStore.get(ANON_COOKIE_NAME)?.value
-  if (existing) return `anon:${existing}`
+  return existing ? `anon:${existing}` : null
+}
+
+/**
+ * Returns a stable shopper id, creating the anonymous cookie when needed.
+ */
+export async function getShopperId(): Promise<string> {
+  const existingShopperId = await getExistingShopperId()
+  if (existingShopperId) return existingShopperId
 
   const id = randomUUID()
+  const cookieStore = await cookies()
   cookieStore.set(ANON_COOKIE_NAME, id, {
     httpOnly: true,
     sameSite: "lax",

@@ -24,7 +24,10 @@
 import { headers } from "next/headers"
 
 import { cartStore } from "@/features/cart/cart-store"
-import { getShopperId } from "@/features/cart/session"
+import {
+  getExistingShopperId,
+  getShopperId,
+} from "@/features/cart/session"
 import { checkoutSchema, type CheckoutFormValues } from "@/lib/validations/checkout"
 import {
   attachProviderReference,
@@ -34,7 +37,11 @@ import {
   type PaymentCompletionResult,
 } from "@/lib/db"
 import { getProvider } from "./provider-registry"
-import { selectProviderForCountry, toAmountCents } from "./payment-logic"
+import {
+  isTestPaymentAllowed,
+  selectProviderForCountry,
+  toAmountCents,
+} from "./payment-logic"
 import type { PaymentNotification, PaymentProviderId } from "./types"
 
 /** Result of starting a checkout payment. */
@@ -179,8 +186,18 @@ export async function completeTestPaymentAction(
   intentId: string,
   success: boolean
 ): Promise<CompleteTestPaymentResult> {
+  const shopperId = await getExistingShopperId()
   const intent = await getIntentById(intentId)
-  if (!intent) {
+  if (
+    !intent ||
+    !shopperId ||
+    !isTestPaymentAllowed(
+      process.env.NODE_ENV,
+      intent.provider,
+      intent.shopperId,
+      shopperId
+    )
+  ) {
     return {
       result: { status: "not-found" },
     }

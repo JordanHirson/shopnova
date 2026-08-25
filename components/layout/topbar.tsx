@@ -8,9 +8,7 @@ import { Button } from "@/components/ui/button"
 export function Topbar() {
   return (
     <header className="flex h-14 items-center gap-4 border-b bg-background px-6">
-      <div className="flex flex-1 items-center gap-2 rounded-lg border bg-muted/50 px-3 py-1.5 text-sm text-muted-foreground">
-        <span>Search...</span>
-      </div>
+      <div className="flex-1" aria-hidden="true" />
       <div className="flex items-center gap-2">
         <Link
           href="/"

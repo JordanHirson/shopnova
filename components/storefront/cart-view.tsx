@@ -19,6 +19,7 @@ import {
 } from "@/features/cart/actions"
 import { useCart } from "@/features/cart/cart-context"
 import { getCartSubtotal } from "@/features/cart/cart-logic"
+import { cn } from "@/lib/utils"
 
 export function CartView() {
   const { cart, loading, error, refresh } = useCart()
@@ -85,6 +86,7 @@ export function CartView() {
   }
 
   const subtotal = getCartSubtotal(cart)
+  const hasUnavailableItems = cart.items.some((item) => item.archived)
 
   return (
     <div className="grid gap-8 lg:grid-cols-[1fr_320px]">
@@ -93,7 +95,10 @@ export function CartView() {
         {cart.items.map((item) => (
           <div
             key={item.productId}
-            className="flex gap-4 rounded-lg border p-4"
+            className={cn(
+              "flex gap-4 rounded-lg border p-4",
+              item.archived && "opacity-75"
+            )}
           >
             <Link
               href={`/products/${item.slug}`}
@@ -122,9 +127,15 @@ export function CartView() {
                   >
                     {item.name}
                   </Link>
-                  <p className="text-sm text-muted-foreground">
-                    R {item.unitPrice.toFixed(2)} each
-                  </p>
+                  {item.archived ? (
+                    <p className="text-sm font-medium text-destructive">
+                      Unavailable — remove this item before checkout.
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      R {item.unitPrice.toFixed(2)} each
+                    </p>
+                  )}
                 </div>
                 <Button
                   type="button"
@@ -138,43 +149,45 @@ export function CartView() {
                 </Button>
               </div>
 
-              <div className="flex items-center justify-between gap-4">
-                <div className="flex items-center gap-1">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-sm"
-                    aria-label="Decrease quantity"
-                    disabled={item.quantity <= 1 || isPending}
-                    onClick={() =>
-                      handleSetQuantity(item.productId, item.quantity - 1)
-                    }
-                  >
-                    <Minus />
-                  </Button>
-                  <span
-                    className="w-10 text-center text-sm font-medium tabular-nums"
-                    aria-live="polite"
-                  >
-                    {item.quantity}
-                  </span>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="icon-sm"
-                    aria-label="Increase quantity"
-                    disabled={isPending}
-                    onClick={() =>
-                      handleSetQuantity(item.productId, item.quantity + 1)
-                    }
-                  >
-                    <Plus />
-                  </Button>
+              {!item.archived && (
+                <div className="flex items-center justify-between gap-4">
+                  <div className="flex items-center gap-1">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="Decrease quantity"
+                      disabled={item.quantity <= 1 || isPending}
+                      onClick={() =>
+                        handleSetQuantity(item.productId, item.quantity - 1)
+                      }
+                    >
+                      <Minus />
+                    </Button>
+                    <span
+                      className="w-10 text-center text-sm font-medium tabular-nums"
+                      aria-live="polite"
+                    >
+                      {item.quantity}
+                    </span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="icon-sm"
+                      aria-label="Increase quantity"
+                      disabled={isPending}
+                      onClick={() =>
+                        handleSetQuantity(item.productId, item.quantity + 1)
+                      }
+                    >
+                      <Plus />
+                    </Button>
+                  </div>
+                  <p className="font-semibold text-foreground">
+                    R {item.lineTotal.toFixed(2)}
+                  </p>
                 </div>
-                <p className="font-semibold text-foreground">
-                  R {item.lineTotal.toFixed(2)}
-                </p>
-              </div>
+              )}
             </div>
           </div>
         ))}
@@ -191,6 +204,11 @@ export function CartView() {
             R {subtotal.toFixed(2)}
           </span>
         </div>
+        {hasUnavailableItems && (
+          <p className="mt-3 text-sm font-medium text-destructive">
+            Remove unavailable items before checking out.
+          </p>
+        )}
         <div className="mt-4 flex flex-col gap-3">
           <Link
             href="/checkout"

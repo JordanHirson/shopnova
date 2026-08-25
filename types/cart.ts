@@ -16,6 +16,7 @@ export interface CartItemData {
   imageUrl: string | null
   unitPrice: number
   quantity: number
+  archived?: boolean
 }
 
 /** A persisted cart line, including the derived line total. */

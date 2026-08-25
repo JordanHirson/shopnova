@@ -2,6 +2,8 @@ import { notFound } from "next/navigation"
 import { Container } from "@/components/layout/container"
 import { getIntentById } from "@/lib/db"
 import { TestPayView } from "@/components/storefront/test-pay-view"
+import { getExistingShopperId } from "@/features/cart/session"
+import { isTestPaymentAllowed } from "@/features/payment/payment-logic"
 
 export const dynamic = "force-dynamic"
 
@@ -13,8 +15,21 @@ export default async function TestPayPage({ searchParams }: TestPayPageProps) {
   const { intentId } = await searchParams
   if (!intentId) notFound()
 
+  const shopperId = await getExistingShopperId()
+  if (!shopperId) notFound()
+
   const intent = await getIntentById(intentId)
-  if (!intent) notFound()
+  if (
+    !intent ||
+    !isTestPaymentAllowed(
+      process.env.NODE_ENV,
+      intent.provider,
+      intent.shopperId,
+      shopperId
+    )
+  ) {
+    notFound()
+  }
 
   return (
     <div className="py-12 sm:py-16">

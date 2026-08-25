@@ -69,6 +69,31 @@ export function amountMatches(
   return toAmountCents(serverAmount) === providerMinorUnits
 }
 
+/** Returns true when two currency codes match without case sensitivity. */
+export function currencyMatches(
+  expectedCurrency: string,
+  providerCurrency: string
+): boolean {
+  return expectedCurrency.trim().toLowerCase() === providerCurrency.trim().toLowerCase()
+}
+
+/**
+ * Returns true only when the local test gateway is being used by the shopper
+ * who owns the intent outside production.
+ */
+export function isTestPaymentAllowed(
+  nodeEnv: string | undefined,
+  intentProvider: string,
+  intentShopperId: string,
+  currentShopperId: string | null | undefined
+): boolean {
+  return (
+    nodeEnv !== "production" &&
+    intentProvider === "test" &&
+    intentShopperId === currentShopperId
+  )
+}
+
 /** Final amount the provider must charge: authoritative total in cents. */
 export function providerAmountFromTotal(total: number): number {
   return toAmountCents(total)

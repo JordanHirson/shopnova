@@ -28,7 +28,7 @@ Open [http://localhost:3000](http://localhost:3000).
 npm test
 ```
 
-Runs the cart, checkout, payment, customer-account, admin, and product-search business logic + webhook verification unit tests using Node's native test runner (111 tests). Covers VAT, shipping, order totals, inventory validation, payment provider selection, authoritative-amount guards, Stripe/PayFast/Test webhook signature verification, Clerk/customer association, order-ownership authorization, admin role matching, admin order-status rules (PENDING/REFUNDED rejected to preserve payment security), and storefront product search (name/description/sku/category matching, case-insensitive, partial matches, archived exclusion, empty/invalid queries, ordering, limits). No real payment credentials are required — provider adapters are tested with mock credentials and real signature math.
+Runs the cart, checkout, payment, customer-account, admin, and product-search business logic + webhook verification unit tests using Node's native test runner (119 tests). Covers VAT, shipping, order totals, inventory validation, payment provider selection, authoritative-amount and currency guards, the local mock-payment gate, Stripe/PayFast/Test webhook signature verification, Clerk/customer association, order-ownership authorization, admin role matching, admin order-status rules (PENDING/REFUNDED rejected to preserve payment security), and storefront product search (name/description/sku/category matching, case-insensitive, partial matches, archived exclusion, empty/invalid queries, ordering, limits). No real payment credentials are required — provider adapters are tested with mock credentials and real signature math.
 
 A small loader shim (`scripts/test-register.mjs`) maps the `server-only` marker package to an empty module so payment provider modules can be imported by the test runner outside a React server context.
 
@@ -38,9 +38,11 @@ ShopNova uses hosted payment UIs so raw card data never touches the server (PCI-
 
 - **Stripe** — hosted Checkout Sessions for international orders. Webhook signature verified with `STRIPE_WEBHOOK_SECRET`.
 - **PayFast** — hosted form (sandbox/production) as the default for South African orders. ITN callback verified with `PAYFAST_PASSPHRASE`.
-- **Test gateway** — mock provider for local development and automated tests (registered only outside production).
+- **Test gateway** — mock provider for local development and automated tests (registered only outside production). Its completion path (`completeTestPaymentAction`, `/checkout/test-pay`) additionally requires that the server is outside production, the checkout intent's provider is `test`, and the intent belongs to the calling shopper.
 
-Orders are created only after a server-verified payment notification. Duplicate webhooks are idempotent. Payment amounts are derived from authoritative server-side values, never client-supplied totals.
+Orders are created only after a server-verified payment notification. Duplicate webhooks are idempotent. Payment amounts are derived from authoritative server-side values, never client-supplied totals: the gateway's verified charge must match the server-computed intent amount **and** currency, or the notification is rejected.
+
+Archived products can never be ordered — archived cart lines are marked unavailable, excluded from the cart subtotal, and rejected at checkout.
 
 See `.env.example` for the required environment variables (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `PAYFAST_MERCHANT_ID`, `PAYFAST_MERCHANT_KEY`, `PAYFAST_PASSPHRASE`, `PAYFAST_TEST_MODE`, optional `TEST_PAYMENT_SECRET`). None are required to run the test suite or to use the local Test gateway.
 

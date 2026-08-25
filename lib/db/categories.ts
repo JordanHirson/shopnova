@@ -16,7 +16,9 @@ export interface CategoryUpdateInput {
 /**
  * Lists all categories for the default store, ordered by name.
  */
-export async function listCategories() {
+export async function listCategories(
+  options: { includeArchivedProducts?: boolean } = {}
+) {
   const storeId = await getDefaultStoreId()
   if (!storeId) return []
 
@@ -24,7 +26,13 @@ export async function listCategories() {
     where: { storeId },
     orderBy: { name: "asc" },
     include: {
-      _count: { select: { products: true } },
+      _count: {
+        select: {
+          products: options.includeArchivedProducts
+            ? true
+            : { where: { archived: false } },
+        },
+      },
     },
   })
 }
@@ -82,6 +90,14 @@ export async function updateCategory(id: string, input: CategoryUpdateInput) {
     throw new Error("No store found.")
   }
 
+  const category = await prisma.category.findFirst({
+    where: { id, storeId },
+    select: { id: true },
+  })
+  if (!category) {
+    throw new Error("Category not found.")
+  }
+
   return prisma.category.update({
     where: { id },
     data: {
@@ -107,8 +123,16 @@ export async function deleteCategory(id: string) {
     throw new Error("No store found.")
   }
 
+  const category = await prisma.category.findFirst({
+    where: { id, storeId },
+    select: { id: true },
+  })
+  if (!category) {
+    throw new Error("Category not found.")
+  }
+
   const productCount = await prisma.product.count({
-    where: { categoryId: id },
+    where: { categoryId: id, category: { storeId } },
   })
 
   if (productCount > 0) {

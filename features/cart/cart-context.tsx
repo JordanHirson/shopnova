@@ -89,7 +89,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const itemCount = useMemo(
-    () => cart.items.reduce((sum, item) => sum + item.quantity, EMPTY_ITEM_COUNT),
+    () =>
+      cart.items.reduce(
+        (sum, item) => sum + (item.archived ? 0 : item.quantity),
+        EMPTY_ITEM_COUNT
+      ),
     [cart]
   )
 

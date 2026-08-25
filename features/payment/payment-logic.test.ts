@@ -14,6 +14,8 @@ import assert from "node:assert/strict"
 
 import {
   amountMatches,
+  currencyMatches,
+  isTestPaymentAllowed,
   providerAmountFromTotal,
   resolveProvider,
   selectProviderForCountry,
@@ -49,6 +51,37 @@ test("amountMatches rejects a tampered client total that does not match the gate
   assert.equal(amountMatches(1, 11500), false)
   assert.equal(amountMatches(115, 1), false)
   assert.equal(amountMatches(115.01, 11500), false)
+})
+
+test("currencyMatches accepts case-insensitive provider currency codes", () => {
+  assert.equal(currencyMatches("ZAR", "zar"), true)
+  assert.equal(currencyMatches(" zar ", "ZAR"), true)
+})
+
+test("currencyMatches rejects a different currency", () => {
+  assert.equal(currencyMatches("ZAR", "USD"), false)
+})
+
+// ── Local test payment gate ──────────────────
+
+test("isTestPaymentAllowed accepts only the intended local-owned test intent", () => {
+  assert.equal(isTestPaymentAllowed("development", "test", "anon-1", "anon-1"), true)
+})
+
+test("isTestPaymentAllowed rejects production", () => {
+  assert.equal(isTestPaymentAllowed("production", "test", "anon-1", "anon-1"), false)
+})
+
+test("isTestPaymentAllowed rejects a non-test provider", () => {
+  assert.equal(isTestPaymentAllowed("development", "stripe", "anon-1", "anon-1"), false)
+})
+
+test("isTestPaymentAllowed rejects a foreign shopper", () => {
+  assert.equal(isTestPaymentAllowed("development", "test", "anon-1", "anon-2"), false)
+})
+
+test("isTestPaymentAllowed rejects a missing shopper identity", () => {
+  assert.equal(isTestPaymentAllowed("development", "test", "anon-1", null), false)
 })
 
 // ── Provider selection ─────────────────────────

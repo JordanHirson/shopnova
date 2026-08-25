@@ -29,6 +29,7 @@ export async function listInventory() {
   if (!storeId) return []
 
   return prisma.inventory.findMany({
+    where: { product: { storeId } },
     orderBy: { product: { name: "asc" } },
     include: {
       product: {

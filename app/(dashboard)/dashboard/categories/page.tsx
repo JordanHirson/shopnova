@@ -18,7 +18,7 @@ export default async function CategoriesPage() {
   // SECURITY: admin authorization happens server-side before any data load.
   await requireAdminOrRedirect()
 
-  const categories = await listCategories()
+  const categories = await listCategories({ includeArchivedProducts: true })
 
   return (
     <Container>

@@ -4,6 +4,7 @@ import { Container } from "@/components/layout/container"
 import { AccountButton } from "@/components/storefront/account-button"
 import { AdminLink } from "@/components/storefront/admin-link"
 import { CartButton } from "@/components/storefront/cart-button"
+import { MobileNav } from "@/components/storefront/mobile-nav"
 import { SearchBox } from "@/components/storefront/search-box"
 import { CartProvider } from "@/features/cart/cart-context"
 import { Package } from "lucide-react"
@@ -17,8 +18,11 @@ export default function MarketingLayout({
     <CartProvider>
       <div className="flex min-h-screen flex-col">
         <header className="border-b">
-          <Container className="flex h-14 items-center justify-between gap-4">
-            <Link href="/" className="flex items-center gap-2 font-semibold">
+          <Container className="flex min-w-0 h-14 items-center justify-between gap-4">
+            <Link
+              href="/"
+              className="flex shrink-0 items-center gap-2 font-semibold"
+            >
               <Package className="h-5 w-5" />
               <span>ShopNova</span>
             </Link>
@@ -60,7 +64,8 @@ export default function MarketingLayout({
                 Contact
               </Link>
             </nav>
-            <div className="flex flex-1 items-center justify-end gap-2 md:flex-none">
+            <div className="flex min-w-0 flex-1 items-center justify-end gap-1 md:flex-none md:gap-2">
+              <MobileNav />
               <Suspense fallback={null}>
                 <SearchBox />
               </Suspense>

@@ -19,6 +19,7 @@ export interface CartProductData {
   imageUrl: string | null
   price: number
   quantityAvailable: number
+  archived: boolean
 }
 
 /**
@@ -47,5 +48,21 @@ export async function getCartProduct(productId: string): Promise<CartProductData
     imageUrl: product.images[0]?.url ?? null,
     price: Number(product.price),
     quantityAvailable: product.inventory.quantity,
+    archived: product.archived,
   }
+}
+
+/** Returns archived status for cart lines belonging to the default store. */
+export async function getCartProductStatuses(
+  productIds: string[]
+): Promise<Map<string, boolean>> {
+  const storeId = await getDefaultStoreId()
+  if (!storeId || productIds.length === 0) return new Map()
+
+  const products = await prisma.product.findMany({
+    where: { id: { in: productIds }, storeId },
+    select: { id: true, archived: true },
+  })
+
+  return new Map(products.map((product) => [product.id, product.archived]))
 }

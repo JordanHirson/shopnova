@@ -43,9 +43,9 @@ export function SearchBox() {
       onSubmit={handleSubmit}
       role="search"
       className={cn(
-        "flex items-center",
+        "flex min-w-0 items-center",
         // On mobile, only the icon shows until activated.
-        expanded ? "w-full sm:w-auto" : "w-auto"
+        expanded ? "w-full sm:w-auto" : "w-9 sm:w-auto"
       )}
     >
       <div className="relative flex w-full items-center">
@@ -68,7 +68,9 @@ export function SearchBox() {
           className={cn(
             "h-9 w-full rounded-lg border border-input bg-transparent pl-8 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",
             // Collapse to icon-only width on small screens until activated.
-            expanded ? "min-w-[10rem] sm:min-w-[14rem]" : "min-w-[8rem] sm:min-w-[14rem]"
+            expanded
+              ? "min-w-[10rem] sm:min-w-[14rem]"
+              : "w-9 min-w-0 sm:min-w-[14rem]"
           )}
         />
       </div>
