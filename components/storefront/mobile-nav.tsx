@@ -8,9 +8,6 @@ const NAV_ITEMS = [
   { href: "/", label: "Home" },
   { href: "/products", label: "Products" },
   { href: "/categories", label: "Categories" },
-  { href: "/about", label: "About" },
-  { href: "/pricing", label: "Pricing" },
-  { href: "/contact", label: "Contact" },
 ] as const
 
 export function MobileNav() {

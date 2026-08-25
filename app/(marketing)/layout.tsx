@@ -45,24 +45,6 @@ export default function MarketingLayout({
               >
                 Categories
               </Link>
-              <Link
-                href="/about"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                About
-              </Link>
-              <Link
-                href="/pricing"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Pricing
-              </Link>
-              <Link
-                href="/contact"
-                className="text-muted-foreground transition-colors hover:text-foreground"
-              >
-                Contact
-              </Link>
             </nav>
             <div className="flex min-w-0 flex-1 items-center justify-end gap-1 md:flex-none md:gap-2">
               <MobileNav />
