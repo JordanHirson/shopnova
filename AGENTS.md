@@ -4,7 +4,7 @@
 
 This repository contains the ShopNova MVP, a university capstone project.
 
-The objective is to build a polished, production-quality MVP within approximately 40 development hours.
+The objective is to build a polished, production-quality MVP.
 
 Always optimize for simplicity, maintainability, and code quality over feature completeness.
 
