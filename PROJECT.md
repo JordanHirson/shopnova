@@ -26,7 +26,7 @@ scripts/          # Utility scripts (e.g. zip-project)
 - **React + TypeScript** throughout.
 - **shadcn/ui Base UI** for component primitives. Custom components built on top.
 - **Prisma 7** for type-safe database access. Schema in `prisma/schema.prisma`.
-- **PostgreSQL 18** with **pgvector** as the database.
+- **PostgreSQL** as the database. (pgvector is not used by the MVP; it is a post-MVP roadmap item.)
 - **Clerk** for authentication.
 - **React Hook Form + Zod** for form validation. No Formik.
 - **TanStack Query** is installed but not currently used in the application.

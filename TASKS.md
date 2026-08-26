@@ -1,5 +1,7 @@
 # ShopNova — Task Tracker
 
+> **MVP status: complete.** All `[x]` items in this file are implemented and verified. The final two sections (`MVP — Known Limitations` and `Post-MVP Roadmap`) are non-blocking limitations and deferred work, respectively.
+
 ## Foundation
 
 - [x] Initialize Next.js project
@@ -91,17 +93,6 @@
 - [x] Unit tests for search logic (28 tests) — name/description/sku/category matching, case-insensitive, partial/substring, no results, archived excluded, empty/invalid query, ordering, limit clamping, null fields
 - [x] Verification: `npx prisma validate`, `npm test` (111 tests), `npx tsc --noEmit`, `npx eslint .` (0 errors), `npx next build`, manual dev-server route check (home/products/search variants/category/product detail/cart all 200; admin routes 307 redirect)
 
-## Post-MVP Roadmap (deferred — NOT required to finish the MVP)
-
-- [ ] Live courier API integration (Bob Go, Aramex, PUDO, Courier Guy) — `ShippingProvider` seam in place
-- [ ] Additional payment gateways: Yoco, Stitch (provider abstraction supports them)
-- [ ] Redis cart store (configure `REDIS_URL` and swap the `CartStore` singleton)
-- [ ] AI/LLM features and agents
-- [ ] pgvector semantic/vector search; PostgreSQL full-text (`tsvector`) and trigram (`pg_trgm`) search
-- [ ] Product federation / marketplace integrations (Shopify, Amazon, Takealot, AliExpress)
-- [ ] Advanced analytics and marketing automation
-- [ ] Admin search
-
 ## Customer Accounts & Order History
 
 - [x] Additive schema change: `Customer.clerkUserId` (nullable, unique) links Clerk users to Customer rows
@@ -159,11 +150,22 @@ Audit of the implemented MVP against `GUIDEBOOK.md` — customer journey, admin 
 
 Audited and found already correct (no change made): verified-webhook-only order creation, webhook idempotency, failed-payment handling, payment-vs-fulfillment status separation, customer order-ownership scoping, admin authorization on every page and server action, Clerk `privateMetadata` role model, server-side Zod validation, no hard-coded secrets, `.env*` gitignored, schema relationships/constraints/`onDelete` behavior. No schema change was required.
 
-## MVP Remaining
+## MVP — Known Limitations (non-blocking)
 
-No MVP requirement is known to be unimplemented. Genuine limitations of the current build (documented, not blockers):
+No MVP requirement is known to be unimplemented. These are genuine limitations of the current build (documented, not blockers):
 
-- [ ] In-memory cart store (`MemoryCartStore`); carts do not survive a restart and are not shared across instances
-- [ ] Stripe and PayFast are unit-tested against real signature math but have never been exercised against the live Stripe API / PayFast sandbox with real credentials
-- [ ] The authorized-admin journey (product/category/inventory/order mutations) has not been manually exercised with a live Clerk admin session — code paths are unit-tested and route protection was verified
-- [ ] Order numbers use a random 6-digit suffix with a unique constraint; a same-day collision surfaces as a checkout error rather than being retried
+- In-memory cart store (`MemoryCartStore`); carts do not survive a restart and are not shared across instances
+- Stripe and PayFast are unit-tested against real signature math but have never been exercised against the live Stripe API / PayFast sandbox with real credentials
+- The authorized-admin journey (product/category/inventory/order mutations) has not been manually exercised with a live Clerk admin session — code paths are unit-tested and route protection was verified
+- Order numbers use a random 6-digit suffix with a unique constraint; a same-day collision surfaces as a checkout error rather than being retried
+
+## Post-MVP Roadmap (deferred — not started)
+
+- [ ] Live courier API integration (Bob Go, Aramex, PUDO, Courier Guy) — `ShippingProvider` seam in place
+- [ ] Additional payment gateways: Yoco, Stitch (provider abstraction supports them)
+- [ ] Redis cart store (configure `REDIS_URL` and swap the `CartStore` singleton)
+- [ ] AI/LLM features and agents
+- [ ] pgvector semantic/vector search; PostgreSQL full-text (`tsvector`) and trigram (`pg_trgm`) search
+- [ ] Product federation / marketplace integrations (Shopify, Amazon, Takealot, AliExpress)
+- [ ] Advanced analytics and marketing automation
+- [ ] Admin search

@@ -2,25 +2,61 @@
 
 **E-commerce SaaS MVP.**
 
-ShopNova is a modern e-commerce platform built with Next.js (App Router), TypeScript, Tailwind CSS, Prisma, PostgreSQL 18 + pgvector, Clerk, and shadcn/ui.
+ShopNova is a modern e-commerce platform built with Next.js (App Router), TypeScript, Tailwind CSS, Prisma, PostgreSQL, Clerk, and shadcn/ui.
 
 ## Stack
 
 - **Framework:** Next.js (App Router)
 - **Language:** TypeScript
 - **Styling:** Tailwind CSS v4 + shadcn/ui Base UI
-- **Database:** PostgreSQL 18 + pgvector
+- **Database:** PostgreSQL (pgvector is not used by the MVP; it is a post-MVP roadmap item)
 - **Database ORM:** Prisma 7
 - **Authentication:** Clerk
 - **Forms:** React Hook Form + Zod
 
-## Getting Started
+## Local Development Setup
 
-```bash
-npm run dev
-```
+1. Install dependencies:
 
-Open [http://localhost:3000](http://localhost:3000).
+   ```bash
+   npm install
+   ```
+
+2. Create a `.env.local` from `.env.example` and configure the required environment variables:
+
+   - `DATABASE_URL` — PostgreSQL connection string (e.g. `postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public`)
+   - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — from your Clerk application
+   - `CLERK_SECRET_KEY` — from your Clerk application (also used by `npm run set-admin`)
+
+   Optional, for real payment gateway testing:
+
+   - `STRIPE_SECRET_KEY` and `STRIPE_WEBHOOK_SECRET`
+   - `PAYFAST_MERCHANT_ID`, `PAYFAST_MERCHANT_KEY`, `PAYFAST_PASSPHRASE`, `PAYFAST_TEST_MODE`
+
+   Optional:
+
+   - `REDIS_URL` — MVP uses the in-memory cart store; Redis is a post-MVP option
+   - `TEST_PAYMENT_SECRET` — override for the local mock payment gateway
+
+3. Push the Prisma schema and generate the client:
+
+   ```bash
+   npx prisma db push
+   ```
+
+4. Seed demo data:
+
+   ```bash
+   npm run db:seed
+   ```
+
+5. Start the dev server:
+
+   ```bash
+   npm run dev
+   ```
+
+   Open [http://localhost:3000](http://localhost:3000).
 
 ## Tests
 
