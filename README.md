@@ -35,7 +35,7 @@ ShopNova is a modern e-commerce platform built with Next.js (App Router), TypeSc
 
    Optional:
 
-   - `REDIS_URL` — MVP uses the in-memory cart store; Redis is a post-MVP option
+   - `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` — Upstash Redis for production cart persistence (see [Cart Persistence](#cart-persistence) below). When both are set, carts are stored in Redis with a 30-day TTL. When unset in development, the cart falls back to an in-memory store. **In production these are required** — ShopNova will not silently fall back to an in-memory cart.
    - `TEST_PAYMENT_SECRET` — override for the local mock payment gateway
 
 3. Push the Prisma schema and generate the client:
@@ -64,7 +64,7 @@ ShopNova is a modern e-commerce platform built with Next.js (App Router), TypeSc
 npm test
 ```
 
-Runs the cart, checkout, payment, customer-account, admin, and product-search business logic + webhook verification unit tests using Node's native test runner (119 tests). Covers VAT, shipping, order totals, inventory validation, payment provider selection, authoritative-amount and currency guards, the local mock-payment gate, Stripe/PayFast/Test webhook signature verification, Clerk/customer association, order-ownership authorization, admin role matching, admin order-status rules (PENDING/REFUNDED rejected to preserve payment security), and storefront product search (name/description/sku/category matching, case-insensitive, partial matches, archived exclusion, empty/invalid queries, ordering, limits). No real payment credentials are required — provider adapters are tested with mock credentials and real signature math.
+Runs the cart, checkout, payment, customer-account, admin, and product-search business logic + webhook verification unit tests using Node's native test runner (142 tests). Covers VAT, shipping, order totals, inventory validation, payment provider selection, authoritative-amount and currency guards, the local mock-payment gate, Stripe/PayFast/Test webhook signature verification, Clerk/customer association, order-ownership authorization, admin role matching, admin order-status rules (PENDING/REFUNDED rejected to preserve payment security), storefront product search (name/description/sku/category matching, case-insensitive, partial matches, archived exclusion, empty/invalid queries, ordering, limits), and the Redis cart store (write/read round trip, update, remove, clear, empty/missing, TTL configuration, serialization/deserialization, shopper isolation, configuration detection, production config failure, credential-free error handling). No real payment or Redis credentials are required — provider adapters are tested with mock credentials and real signature math, and the Redis cart store is tested with a fake `RedisLike` client.
 
 A small loader shim (`scripts/test-register.mjs`) maps the `server-only` marker package to an empty module so payment provider modules can be imported by the test runner outside a React server context.
 
@@ -81,6 +81,33 @@ Orders are created only after a server-verified payment notification. Duplicate 
 Archived products can never be ordered — archived cart lines are marked unavailable, excluded from the cart subtotal, and rejected at checkout.
 
 See `.env.example` for the required environment variables (`STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `PAYFAST_MERCHANT_ID`, `PAYFAST_MERCHANT_KEY`, `PAYFAST_PASSPHRASE`, `PAYFAST_TEST_MODE`, optional `TEST_PAYMENT_SECRET`). None are required to run the test suite or to use the local Test gateway.
+
+## Cart Persistence
+
+Carts are stored server-side behind a provider-agnostic `CartStore` interface (`features/cart/cart-store.ts`). The active backend is chosen at runtime:
+
+- **`RedisCartStore`** (`features/cart/redis-cart-store.ts`) — production store backed by **Upstash Redis** (REST API), the guidebook's chosen cache and the recommended Redis provider for Next.js/Vercel serverless. Used when both `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` are set.
+- **`MemoryCartStore`** — development-only fallback (in-memory `Map` on `globalThis`) that survives page navigation while the dev server runs. Not production-ready (no cross-instance sharing, no restart survival).
+
+### Configuring Upstash Redis
+
+1. Create a Redis database at [console.upstash.com](https://console.upstash.com/redis).
+2. Copy the **REST URL** and **REST Token** from your database page.
+3. Add them to `.env.local`:
+
+   ```
+   UPSTASH_REDIS_REST_URL=https://<your-db>.upstash.io
+   UPSTASH_REDIS_REST_TOKEN=<your-token>
+   ```
+
+### Behavior
+
+- **30-day TTL** (`CART_TTL_SECONDS = 60 * 60 * 24 * 30`), refreshed on every cart write via an atomic `SET ... EX` call so an active shopper's cart never expires out from under them.
+- **Key design:** `cart:<shopper-id>` — namespaced, per-shopper, no personal data (the shopper id is `user:<clerkUserId>` or `anon:<uuid>`). Carts from different shoppers cannot collide.
+- **Serialization:** only the cart data needed by the cart architecture is stored (no full Prisma Product records). Money is stored as the existing number snapshot captured at add-to-cart time; checkout re-reads authoritative prices from PostgreSQL, so the persisted snapshot is display-only.
+- **Production guard:** if production starts without Redis credentials, ShopNova throws a `CartConfigurationError` with an actionable message — it never silently falls back to an in-memory cart (which would silently lose cart persistence). The store is resolved lazily on first use so `next build` does not require credentials at build time.
+- **Error handling:** if Redis is unavailable during an operation, `RedisCartStore` throws a `CartStoreError` with a generic, credential-free message (the original driver error is preserved on `cause` for server-side debugging). It never silently pretends the operation succeeded.
+- **Concurrency limitation:** cart mutations follow a load → mutate → save cycle. The Redis `SET ... EX` write is atomic, but the read-modify-write window is not — two simultaneous mutations for the same shopper could race (last write wins). This matches the previous in-memory behavior and is acceptable for a single-shopper cart; distributed locking is intentionally not added.
 
 ## Customer Accounts & Order History
 

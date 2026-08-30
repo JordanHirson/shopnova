@@ -41,5 +41,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-# zip files
+# zip files and project
 *.zip
+scripts/zip-project.ps1

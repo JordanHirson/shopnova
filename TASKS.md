@@ -154,18 +154,38 @@ Audited and found already correct (no change made): verified-webhook-only order 
 
 No MVP requirement is known to be unimplemented. These are genuine limitations of the current build (documented, not blockers):
 
-- In-memory cart store (`MemoryCartStore`); carts do not survive a restart and are not shared across instances
+- ~~In-memory cart store (`MemoryCartStore`); carts do not survive a restart and are not shared across instances~~ **Resolved by Post-MVP #1 (Redis cart persistence).** `MemoryCartStore` remains as the development-only fallback when Redis credentials are absent.
+- Cart read-modify-write is not atomic across the load → mutate → save cycle; two simultaneous mutations for the same shopper could race (last write wins). The Redis `SET ... EX` write itself is atomic, and distributed locking is intentionally not added (acceptable for a single-shopper cart).
 - Stripe and PayFast are unit-tested against real signature math but have never been exercised against the live Stripe API / PayFast sandbox with real credentials
 - The authorized-admin journey (product/category/inventory/order mutations) has not been manually exercised with a live Clerk admin session — code paths are unit-tested and route protection was verified
 - Order numbers use a random 6-digit suffix with a unique constraint; a same-day collision surfaces as a checkout error rather than being retried
 
 ## Post-MVP Roadmap (deferred — not started)
 
+- [x] **Redis cart store (Post-MVP #1)** — `RedisCartStore` backed by Upstash Redis (REST API) with a 30-day TTL, behind the existing provider-agnostic `CartStore` abstraction. Configure `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`; production fails fast with `CartConfigurationError` when these are absent (no silent in-memory fallback). Development falls back to `MemoryCartStore` when Redis is not configured.
 - [ ] Live courier API integration (Bob Go, Aramex, PUDO, Courier Guy) — `ShippingProvider` seam in place
 - [ ] Additional payment gateways: Yoco, Stitch (provider abstraction supports them)
-- [ ] Redis cart store (configure `REDIS_URL` and swap the `CartStore` singleton)
 - [ ] AI/LLM features and agents
 - [ ] pgvector semantic/vector search; PostgreSQL full-text (`tsvector`) and trigram (`pg_trgm`) search
 - [ ] Product federation / marketplace integrations (Shopify, Amazon, Takealot, AliExpress)
 - [ ] Advanced analytics and marketing automation
 - [ ] Admin search
+
+## Post-MVP #1 — Redis Cart Persistence
+
+- [x] Inspect existing cart implementation (`cart-store`, `actions`, `session`, `cart-logic`, `cart-context`, db helpers, `.env.example`, `package.json`, Prisma, guidebook cart architecture)
+- [x] `RedisCartStore` (`features/cart/redis-cart-store.ts`) using `@upstash/redis` REST client (Next.js/Vercel serverless compatible); minimum dependency added
+- [x] Provider-agnostic abstraction preserved (`CartStore` interface; `MemoryCartStore` kept for dev; `RedisCartStore` for real persistence)
+- [x] Environment configuration via `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` (added to `.env.example`); no real credentials committed; `.env.local` not committed
+- [x] Store selection: Redis when configured → `RedisCartStore`; dev without credentials → `MemoryCartStore`; production without credentials → `CartConfigurationError` (no silent fallback). Lazy resolution so `next build` is credential-free
+- [x] Redis key design: `cart:<shopper-id>` (namespaced, stable, per-shopper; reuses existing shopper/session identity; no PII)
+- [x] Serialization: only the cart data needed is stored (no full Prisma Product records); money stored as the existing number snapshot; `serializeCart`/`deserializeCart` round-trip safely and reject corrupt payloads
+- [x] TTL: `CART_TTL_SECONDS = 60 * 60 * 24 * 30` (30 days), refreshed on every write via atomic `SET ... EX`
+- [x] Concurrency: atomic `SET ... EX` write; read-modify-write race documented as a known limitation (no distributed locking added)
+- [x] Local development: `MemoryCartStore` preserved; active store choice explicit; production Redis requirement documented
+- [x] Existing functionality unchanged: add to cart, add same product, quantity update, remove item, clear cart, item count, subtotal, inventory limits, checkout, payment initiation, cart clearing after payment, anonymous/authenticated carts, customer/account, admin — no unrelated code modified
+- [x] Tests: 23 Redis cart store + selection tests (write/read round trip, update, remove, clear, empty/missing, TTL config, serialization/deserialization, shopper isolation, config detection, production config failure, error handling with credential-free messages). Existing pure cart-logic tests kept. Total suite: 142 tests
+- [x] Error handling: Redis failures throw `CartStoreError` (generic, credential-free message; original error on `cause`); never silently succeeds
+- [x] Documentation: PROJECT.md, TASKS.md, README.md, `.env.example` updated; GUIDEBOOK.md untouched
+- [x] Verification: `npx prisma validate`, `npx tsc --noEmit`, `npm test` (142 tests), `npx eslint .` (0 errors, 3 pre-existing warnings), `npx next build` — all pass
+- [x] Real Redis was NOT exercised (no Upstash credentials in this environment); implementation verified with a fake `RedisLike` client; `MemoryCartStore` fallback and selection logic verified
