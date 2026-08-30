@@ -142,10 +142,15 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
               </div>
               <div className="flex justify-between">
                 <dt className="text-muted-foreground">Shipping</dt>
-                <dd className="font-medium text-foreground">
+                <dd className="text-right font-medium text-foreground">
                   {Number(order.shipping) === 0
                     ? "Free"
                     : formatCurrency(Number(order.shipping), order.currency)}
+                  {order.shippingMethod ? (
+                    <span className="block text-xs font-normal text-muted-foreground">
+                      {order.shippingMethod}
+                    </span>
+                  ) : null}
                 </dd>
               </div>
               <div className="flex justify-between">

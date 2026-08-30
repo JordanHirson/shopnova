@@ -27,6 +27,17 @@ import type { PaymentNotification, PaymentProviderId } from "@/features/payment/
 import { cartStore } from "@/features/cart/cart-store"
 import { clerkUserIdFromShopperId } from "@/features/account/account-logic"
 import { amountMatches, currencyMatches } from "@/features/payment/payment-logic"
+import {
+  getAuthoritativeShippingQuote,
+  getShippingOrigin,
+} from "@/features/shipping/provider-registry"
+import {
+  buildQuoteRequest,
+  isShippingDestinationComplete,
+  quoteToSnapshot,
+  shippingAddressFromDestination,
+  snapshotToRate,
+} from "@/features/shipping/shipping-logic"
 
 /** A single product line stored on an intent (authoritative quantity snapshot). */
 export interface IntentLine {
@@ -89,13 +100,34 @@ export async function createCheckoutIntent(
   if (quantityError) throw new Error(quantityError)
 
   let subtotal = 0
+  let itemCount = 0
   for (const line of input.items) {
     const product = productById.get(line.productId)
     if (!product) throw new Error("A product in your cart is no longer available.")
     subtotal += Math.round(Number(product.price) * 100 * line.quantity) / 100
+    itemCount += line.quantity
   }
 
-  const shipping = calculateShipping(subtotal)
+  // Authoritative shipping quote: obtained server-side through the
+  // shipping-provider abstraction from the validated destination. The
+  // client never supplies a shipping rate — only the destination (address),
+  // which is mapped into the common internal request here. Provider-specific
+  // mapping happens inside each courier adapter.
+  const currency = "ZAR"
+  if (!isShippingDestinationComplete(input.details)) {
+    throw new Error("A complete shipping address is required to get a quote.")
+  }
+
+  const quoteRequest = buildQuoteRequest({
+    origin: getShippingOrigin(),
+    destination: shippingAddressFromDestination(input.details),
+    subtotal,
+    currency,
+    itemCount,
+  })
+  const quote = await getAuthoritativeShippingQuote(quoteRequest)
+
+  const shipping = quote.rate
   const vat = calculateVat(subtotal)
   const total = calculateOrderTotal(subtotal, shipping, vat)
 
@@ -106,7 +138,9 @@ export async function createCheckoutIntent(
       provider: input.provider,
       shopperId: input.shopperId,
       amount: total,
-      currency: "ZAR",
+      currency,
+      shipping,
+      shippingQuote: quoteToSnapshot(quote) as unknown as object,
       details: input.details as unknown as object,
       items: input.items as unknown as object,
     },
@@ -261,7 +295,34 @@ export async function completePaidIntent(
 
     // Subtotal is computed directly from the authoritative DB price snapshots.
     const computedSubtotal = orderItems.reduce((sum, i) => sum + i.totalPrice, 0)
-    const shipping = calculateShipping(computedSubtotal)
+
+    // Shipping is REUSED from the snapshot captured at intent time so the
+    // order reproduces exactly what was quoted and charged — live courier
+    // rates are never re-fetched at order creation (rates can change; the
+    // charged amount must not). A missing snapshot (legacy intent created
+    // before shipping snapshots) falls back to the deterministic MVP rule.
+    const intentCurrency = intent.currency || "ZAR"
+    let shipping: number
+    let shippingProvider: string
+    let shippingMethod: string
+    if (intent.shippingQuote) {
+      const snapshot = snapshotToRate(intent.shippingQuote, intentCurrency)
+      if (!snapshot) {
+        await tx.checkoutIntent.update({
+          where: { id: intent.id },
+          data: { status: "FAILED", errorCode: "invalid_shipping_snapshot" },
+        })
+        throw new Error("The shipping quote for this checkout is no longer valid.")
+      }
+      shipping = Number(intent.shipping)
+      shippingProvider = snapshot.provider
+      shippingMethod = snapshot.method
+    } else {
+      shipping = calculateShipping(computedSubtotal)
+      shippingProvider = "mvp"
+      shippingMethod = shipping === 0 ? "Free shipping" : "Standard shipping"
+    }
+
     const vat = calculateVat(computedSubtotal)
     const total = calculateOrderTotal(computedSubtotal, shipping, vat)
 
@@ -308,6 +369,8 @@ export async function completePaidIntent(
         shippingProvince: details.province,
         shippingPostalCode: details.postalCode,
         shippingCountry: details.country,
+        shippingProvider,
+        shippingMethod,
       },
     })
 

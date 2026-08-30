@@ -163,7 +163,7 @@ No MVP requirement is known to be unimplemented. These are genuine limitations o
 ## Post-MVP Roadmap (deferred — not started)
 
 - [x] **Redis cart store (Post-MVP #1)** — `RedisCartStore` backed by Upstash Redis (REST API) with a 30-day TTL, behind the existing provider-agnostic `CartStore` abstraction. Configure `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`; production fails fast with `CartConfigurationError` when these are absent (no silent in-memory fallback). Development falls back to `MemoryCartStore` when Redis is not configured.
-- [ ] Live courier API integration (Bob Go, Aramex, PUDO, Courier Guy) — `ShippingProvider` seam in place
+- [~] **Live courier API integration (Post-MVP #2)** — `ShippingProvider` abstraction + registry complete; checkout now obtains an authoritative server-side shipping quote from the destination. No live courier adapter is wired yet (official API contracts/credentials unavailable); the deterministic MVP provider remains the documented fallback. Bob Go / Aramex / PUDO / The Courier Guy adapters are the remaining work.
 - [ ] Additional payment gateways: Yoco, Stitch (provider abstraction supports them)
 - [ ] AI/LLM features and agents
 - [ ] pgvector semantic/vector search; PostgreSQL full-text (`tsvector`) and trigram (`pg_trgm`) search
@@ -189,3 +189,28 @@ No MVP requirement is known to be unimplemented. These are genuine limitations o
 - [x] Documentation: PROJECT.md, TASKS.md, README.md, `.env.example` updated; GUIDEBOOK.md untouched
 - [x] Verification: `npx prisma validate`, `npx tsc --noEmit`, `npm test` (142 tests), `npx eslint .` (0 errors, 3 pre-existing warnings), `npx next build` — all pass
 - [x] Real Redis was NOT exercised (no Upstash credentials in this environment); implementation verified with a fake `RedisLike` client; `MemoryCartStore` fallback and selection logic verified
+
+## Post-MVP #2 — Live Courier / Shipping API Integration
+
+- [x] Inspected GUIDEBOOK.md, PROJECT.md, TASKS.md, existing checkout logic, checkout actions, checkout validation, order creation (`lib/db/payments.ts`), Order schema, the existing `ShippingProvider` seam, `.env.example`, `package.json`, existing tests
+- [x] `ShippingProvider` abstraction (`features/shipping/shipping-provider.ts`) — `ShippingProvider` interface, `ShippingQuoteRequest`/`ShippingQuote` types, `ShippingAddress`/`Parcel`, `ShippingProviderError`, `ShippingProviderId` union (mvp/bobgo/aramex/pudo/courier-guy)
+- [x] `MvpShippingProvider` keeps the deterministic free-above-$50 / flat-$5 rule (the documented deliberate fallback); `FakeShippingProvider` for deterministic tests
+- [x] Pure shipping logic (`features/shipping/shipping-logic.ts`) — destination completeness (type guard), address normalization, parcel/request building, `normalizeQuote` (defensive validation of provider responses), `selectCheapestQuote` (cents math, deterministic tie-break), quote↔snapshot round-trip
+- [x] Server-only provider registry (`features/shipping/provider-registry.ts`) — `selectProvidersFromFactories`, `getConfiguredShippingProviders`, `collectQuotesFromProviders` (`Promise.allSettled` fan-out per guidebook), `getShippingQuotes`, `getAuthoritativeShippingQuote`, `getShippingOrigin` (env-configurable), `ShippingQuoteError`
+- [x] Provider strategy: when one or more live couriers are configured, ONLY live couriers are queried (MVP is NOT a silent fallback — a failed live quote is never replaced with an arbitrary price); when no live courier is configured, the deterministic MVP provider is used (documented fallback)
+- [x] Failure behavior: if every configured provider fails or returns no valid quote, `ShippingQuoteError` is thrown — checkout surfaces a safe user-facing error and creates no order with an incorrect amount; provider errors are preserved on `causes` for server-side diagnostics (never exposed to the client)
+- [x] Additive Prisma schema (no data reset, no existing order modified): `CheckoutIntent.shipping` (snapshotted amount) + `CheckoutIntent.shippingQuote` (full quote JSON); `Order.shippingProvider` + `Order.shippingMethod` (nullable for historical orders)
+- [x] Authoritative quote wired into `createCheckoutIntent` — server obtains the quote from the validated destination via the abstraction, snapshots it on the intent, computes the authoritative total. The client never supplies a shipping rate (only the address)
+- [x] `completePaidIntent` reuses the snapshotted shipping (never re-fetches a live quote at order creation) so the order reproduces exactly what was charged; legacy intents (no snapshot) fall back to the deterministic rule
+- [x] Order snapshot: `Order.shipping` amount + `shippingProvider` + `shippingMethod` captured at order time; historical orders are never retroactively changed when rates change
+- [x] Destination-aware checkout summary (`getCheckoutSummaryAction`) — uses the provider abstraction when a complete destination is supplied; deterministic MVP estimate before the address is filled. `CheckoutSummary` now includes `shippingProvider`/`shippingMethod`
+- [x] `getShippingQuoteAction` (`features/shipping/actions.ts`) — server-side entry point to obtain quotes for a destination; subtotal recomputed server-side; client supplies only the address
+- [x] Checkout view re-fetches the summary with the destination once the address is complete (RHF `useWatch`); the client is never authoritative for the shipping rate
+- [x] Order detail pages (account + admin) show the shipping method when present (additive; historical orders show amount only)
+- [x] Address validation reuses the existing checkout address fields; no checkout form redesign. Provider-specific address mapping happens inside adapters via the common internal `ShippingAddress`
+- [x] Environment variables: `SHIPPING_ORIGIN_*` (optional, SA defaults) added to `.env.example`; live courier credential variables documented as pending placeholders; courier secrets are server-only and never reach the client
+- [x] Tests: 55 shipping tests (`features/shipping/shipping-logic.test.ts` + `features/shipping/shipping-provider.test.ts`) — provider contract, quote normalization, provider selection, successful quote, provider failure, invalid/malformed responses, missing configuration, currency mismatch, shipping-cost calculation, checkout total integration, protection against client-supplied shipping manipulation (form schema has no shipping field; total uses server quote rate). Total suite: 197 tests. No real courier credentials required (`FakeShippingProvider` + extracted pure registry helpers)
+- [x] Existing tests kept passing; Redis cart, payment, account, admin, search functionality unchanged
+- [x] Documentation: PROJECT.md, TASKS.md, README.md, `.env.example` updated; GUIDEBOOK.md untouched
+- [x] Verification: `npx prisma validate`, `npx prisma generate`, `npx tsc --noEmit`, `npm test` (197 tests), `npx eslint .` (0 errors, 2 pre-existing warnings), `npx next build` — all pass
+- [x] No live courier API was exercised (no official credentials/contracts in this environment); the deterministic MVP provider + `FakeShippingProvider` verify the abstraction, registry, snapshot, and checkout integration. Live courier adapters (Bob Go, Aramex, PUDO, The Courier Guy) remain pending official API contracts + server-side credentials

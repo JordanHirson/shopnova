@@ -3,22 +3,36 @@
  *
  * The client is NEVER trusted for price, inventory, subtotal, tax,
  * shipping, or total. All authoritative values are re-read from
- * PostgreSQL. Order creation now happens only after a server-verified
+ * PostgreSQL. Order creation happens only after a server-verified
  * payment notification (see features/payment/actions.ts and
  * lib/db/payments.ts); this module exposes the authoritative checkout
- * summary and order lookup used by the UI.
+ * summary (with a server-obtained shipping quote) and order lookup.
+ *
+ * SHIPPING:
+ * - `getCheckoutSummaryAction` accepts an optional destination. When the
+ *   destination is complete, shipping is obtained through the server-side
+ *   shipping-provider abstraction (authoritative quote). When no
+ *   destination is supplied (e.g. before the address form is filled), the
+ *   deterministic MVP estimate is shown so the summary always renders.
+ * - The displayed summary is an estimate until the authoritative quote is
+ *   taken at intent creation (`createCheckoutIntent`). The client never
+ *   supplies a shipping rate.
  */
 "use server"
 
 import { getOrderByOrderNumber } from "@/lib/db"
-import { cartStore } from "@/features/cart/cart-store"
-import { getShopperId } from "@/features/cart/session"
-import { getCartProduct } from "@/lib/db/cart"
+import { calculateOrderTotal, calculateShipping, calculateVat } from "./checkout-logic"
+import { loadAuthoritativeCheckoutLines } from "./checkout-lines"
 import {
-  calculateOrderTotal,
-  calculateShipping,
-  calculateVat,
-} from "./checkout-logic"
+  buildQuoteRequest,
+  isShippingDestinationComplete,
+  shippingAddressFromDestination,
+  type CheckoutDestination,
+} from "@/features/shipping/shipping-logic"
+import {
+  getAuthoritativeShippingQuote,
+  getShippingOrigin,
+} from "@/features/shipping/provider-registry"
 
 /** Authoritative checkout summary returned to the client. */
 export interface CheckoutSummary {
@@ -33,6 +47,10 @@ export interface CheckoutSummary {
   }>
   subtotal: number
   shipping: number
+  /** Shipping provider id (e.g. "mvp") when a quote was obtained, else null. */
+  shippingProvider: string | null
+  /** Shipping method name when a quote was obtained, else null. */
+  shippingMethod: string | null
   vat: number
   total: number
 }
@@ -41,41 +59,56 @@ export interface CheckoutSummary {
  * Returns the authoritative checkout summary for the current shopper's
  * cart. Re-reads prices and inventory from PostgreSQL so the displayed
  * totals always match what will be charged at order creation.
+ *
+ * When a complete `destination` is supplied, shipping is obtained through
+ * the server-side shipping-provider abstraction (the authoritative quote
+ * the order will use). When omitted, the deterministic MVP estimate is
+ * shown so the summary renders before the address is filled.
  */
-export async function getCheckoutSummaryAction(): Promise<CheckoutSummary | null> {
-  const shopperId = await getShopperId()
-  const cart = await cartStore.getCart(shopperId)
-  if (!cart || cart.items.length === 0) return null
+export async function getCheckoutSummaryAction(
+  destination?: Partial<CheckoutDestination>
+): Promise<CheckoutSummary | null> {
+  const lines = await loadAuthoritativeCheckoutLines()
+  if (!lines) return null
 
-  const items: CheckoutSummary["items"] = []
-  let subtotal = 0
+  const currency = "ZAR"
+  let shipping: number
+  let shippingProvider: string | null
+  let shippingMethod: string | null
 
-  for (const line of cart.items) {
-    const product = await getCartProduct(line.productId)
-    if (!product) continue
-
-    const unitPrice = product.price
-    const lineTotal = Math.round(unitPrice * 100 * line.quantity) / 100
-    subtotal += lineTotal
-
-    items.push({
-      productId: product.id,
-      name: product.name,
-      slug: product.slug,
-      imageUrl: product.imageUrl,
-      quantity: line.quantity,
-      unitPrice,
-      lineTotal,
-    })
+  if (destination && isShippingDestinationComplete(destination)) {
+    // Authoritative quote through the provider abstraction.
+    const quote = await getAuthoritativeShippingQuote(
+      buildQuoteRequest({
+        origin: getShippingOrigin(),
+        destination: shippingAddressFromDestination(destination),
+        subtotal: lines.subtotal,
+        currency,
+        itemCount: lines.itemCount,
+      })
+    )
+    shipping = quote.rate
+    shippingProvider = quote.provider
+    shippingMethod = quote.method
+  } else {
+    // Deterministic MVP estimate (display only until the address is filled).
+    shipping = calculateShipping(lines.subtotal)
+    shippingProvider = null
+    shippingMethod = null
   }
 
-  if (items.length === 0) return null
+  const vat = calculateVat(lines.subtotal)
+  const total = calculateOrderTotal(lines.subtotal, shipping, vat)
 
-  const shipping = calculateShipping(subtotal)
-  const vat = calculateVat(subtotal)
-  const total = calculateOrderTotal(subtotal, shipping, vat)
-
-  return { items, subtotal, shipping, vat, total }
+  return {
+    items: lines.items,
+    subtotal: lines.subtotal,
+    shipping,
+    shippingProvider,
+    shippingMethod,
+    vat,
+    total,
+  }
 }
 
 /** Returns an order by its order number for the confirmation page. */

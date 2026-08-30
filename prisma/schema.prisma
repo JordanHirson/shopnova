@@ -168,6 +168,11 @@ model Order {
   shippingPostalCode String  @db.VarChar(20)
   shippingCountry    String  @db.VarChar(255)
 
+  /** Courier that quoted the shipping rate (e.g. "mvp" | "bobgo"). Nullable for historical orders. */
+  shippingProvider String? @db.VarChar(40)
+  /** Courier method name quoted at checkout (e.g. "Standard shipping"). Nullable for historical orders. */
+  shippingMethod   String? @db.VarChar(100)
+
   currency String @default("ZAR") @db.VarChar(10)
 
   storeId    String   @db.Uuid
@@ -206,6 +211,12 @@ model CheckoutIntent {
   /** Authoritative amount (server-computed from DB prices + VAT + shipping). */
   amount   Decimal @db.Decimal(10, 2)
   currency String  @default("R") @db.VarChar(10)
+
+  /** Authoritative shipping amount snapshotted from the courier quote at intent time. */
+  shipping Decimal @default(0) @db.Decimal(10, 2)
+
+  /** Full shipping quote snapshot { provider, method, rate, currency, estimateDays } for reproduction. */
+  shippingQuote Json?
 
   /** Shipping + contact snapshot captured at form submit (validated server-side). */
   details Json

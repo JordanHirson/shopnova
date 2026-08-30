@@ -10,8 +10,8 @@
 "use client"
 
 import Link from "next/link"
-import { useEffect, useState, useTransition } from "react"
-import { useForm } from "react-hook-form"
+import { useEffect, useRef, useState, useTransition } from "react"
+import { useForm, useWatch } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useUser } from "@clerk/nextjs"
 import { ImageIcon, Loader2 } from "lucide-react"
@@ -92,6 +92,53 @@ export function CheckoutView() {
       active = false
     }
   }, [])
+
+  // Re-fetch the summary with the shipping destination once the address is
+  // complete so the displayed shipping cost is the server-authoritative
+  // quote (not a client-supplied rate). The server re-validates the
+  // destination and recomputes the subtotal; the client only passes the
+  // address fields it already collected.
+  const lastQuoteKey = useRef<string>("")
+  const watchedAddress = useWatch({
+    control: form.control,
+    name: ["shippingAddress", "city", "province", "postalCode", "country"],
+  })
+  const [shippingAddress, city, province, postalCode, country] = watchedAddress
+
+  useEffect(() => {
+    const sa = shippingAddress ?? ""
+    const c = city ?? ""
+    const p = province ?? ""
+    const pc = postalCode ?? ""
+    const co = country ?? ""
+
+    const isComplete =
+      Boolean(sa.trim()) &&
+      Boolean(c.trim()) &&
+      Boolean(p.trim()) &&
+      Boolean(pc.trim()) &&
+      Boolean(co.trim())
+    if (!isComplete) return
+
+    const key = `${sa}|${c}|${p}|${pc}|${co}`
+    if (key === lastQuoteKey.current) return
+    lastQuoteKey.current = key
+
+    void getCheckoutSummaryAction({
+      shippingAddress: sa,
+      city: c,
+      province: p,
+      postalCode: pc,
+      country: co,
+    })
+      .then((data) => {
+        if (data) setSummary(data)
+      })
+      .catch(() => {
+        // Keep the last successful estimate; the authoritative quote is
+        // always re-taken at intent creation regardless of the display.
+      })
+  }, [shippingAddress, city, province, postalCode, country])
 
   // Prefill contact info from Clerk when available.
   useEffect(() => {
