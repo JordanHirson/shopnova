@@ -17,6 +17,8 @@ import type { PaymentProviderId } from "./types"
 export const SUPPORTED_PROVIDERS: readonly PaymentProviderId[] = [
   "stripe",
   "payfast",
+  "yoco",
+  "stitch",
   "test",
 ] as const
 
@@ -97,4 +99,19 @@ export function isTestPaymentAllowed(
 /** Final amount the provider must charge: authoritative total in cents. */
 export function providerAmountFromTotal(total: number): number {
   return toAmountCents(total)
+}
+
+/**
+ * Returns true only when a webhook's provider matches the intent's provider.
+ *
+ * Webhook processing is provider-specific: a verified notification from
+ * gateway X must never complete a CheckoutIntent created for gateway Y.
+ * Provider ids are case-sensitive (they are server-generated, never
+ * client-supplied), so an exact comparison is the correct boundary.
+ */
+export function isProviderMatch(
+  intentProvider: string,
+  webhookProvider: string
+): boolean {
+  return intentProvider === webhookProvider
 }

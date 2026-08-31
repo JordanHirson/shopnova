@@ -64,7 +64,7 @@ export async function handleProviderWebhook(
   }
 
   try {
-    const result = await completePaidIntent(notification)
+    const result = await completePaidIntent(notification, providerId)
     switch (result.status) {
       case "success":
         return { status: 200, body: { ok: true, result: "success" } }
@@ -75,6 +75,10 @@ export async function handleProviderWebhook(
       case "amount-mismatch":
         // Amount mismatch is a potential fraud signal — do not retry.
         return { status: 400, body: { ok: false, result: "amount_mismatch" } }
+      case "provider-mismatch":
+        // A webhook from one provider referencing another provider's intent
+        // is a potential fraud / routing signal — do not retry.
+        return { status: 400, body: { ok: false, result: "provider_mismatch" } }
       case "not-found":
         return { status: 404, body: { ok: false, result: "not_found" } }
     }

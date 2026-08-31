@@ -15,6 +15,7 @@ import assert from "node:assert/strict"
 import {
   amountMatches,
   currencyMatches,
+  isProviderMatch,
   isTestPaymentAllowed,
   providerAmountFromTotal,
   resolveProvider,
@@ -106,18 +107,48 @@ test("resolveProvider accepts a supported, configured provider", () => {
 })
 
 test("resolveProvider rejects an unsupported provider id", () => {
-  assert.equal(resolveProvider("yoco", ["stripe", "payfast"]), null)
-  assert.equal(resolveProvider("stitch", ["stripe", "payfast"]), null)
+  assert.equal(resolveProvider("paypal", ["stripe", "payfast"]), null)
+  assert.equal(resolveProvider("eft", ["stripe", "payfast"]), null)
   assert.equal(resolveProvider("", ["stripe", "payfast"]), null)
   assert.equal(resolveProvider("STRIPE", ["stripe", "payfast"]), null) // case-sensitive
+})
+
+test("resolveProvider accepts Yoco and Stitch when they are configured", () => {
+  assert.equal(resolveProvider("yoco", ["stripe", "payfast", "yoco"]), "yoco")
+  assert.equal(resolveProvider("stitch", ["stripe", "payfast", "stitch"]), "stitch")
 })
 
 test("resolveProvider rejects a supported but unconfigured provider", () => {
   // Stripe is supported but not configured (no secret keys) -> null.
   assert.equal(resolveProvider("stripe", ["payfast"]), null)
   assert.equal(resolveProvider("payfast", ["stripe"]), null)
+  assert.equal(resolveProvider("yoco", ["stripe", "payfast"]), null)
+  assert.equal(resolveProvider("stitch", ["stripe", "payfast"]), null)
 })
 
-test("SUPPORTED_PROVIDERS includes stripe, payfast, and the test gateway", () => {
-  assert.deepEqual([...SUPPORTED_PROVIDERS], ["stripe", "payfast", "test"])
+test("SUPPORTED_PROVIDERS includes stripe, payfast, yoco, stitch, and the test gateway", () => {
+  assert.deepEqual([...SUPPORTED_PROVIDERS], ["stripe", "payfast", "yoco", "stitch", "test"])
+})
+
+// ── Provider-match boundary ───────────────────
+
+test("isProviderMatch accepts a webhook provider that matches the intent provider", () => {
+  assert.equal(isProviderMatch("stripe", "stripe"), true)
+  assert.equal(isProviderMatch("yoco", "yoco"), true)
+  assert.equal(isProviderMatch("stitch", "stitch"), true)
+  assert.equal(isProviderMatch("test", "test"), true)
+})
+
+test("isProviderMatch rejects a webhook from a different provider", () => {
+  // A Yoco webhook must not complete a Stripe/PayFast/Stitch intent, etc.
+  assert.equal(isProviderMatch("stripe", "yoco"), false)
+  assert.equal(isProviderMatch("yoco", "stripe"), false)
+  assert.equal(isProviderMatch("payfast", "yoco"), false)
+  assert.equal(isProviderMatch("stitch", "yoco"), false)
+  assert.equal(isProviderMatch("test", "stripe"), false)
+})
+
+test("isProviderMatch is case-sensitive (provider ids are server-generated)", () => {
+  assert.equal(isProviderMatch("stripe", "Stripe"), false)
+  assert.equal(isProviderMatch("YOCO", "yoco"), false)
 })

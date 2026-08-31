@@ -215,6 +215,6 @@ export async function completeTestPaymentAction(
     errorCode: success ? undefined : "declined",
   }
 
-  const result = await completePaidIntent(notification)
+  const result = await completePaidIntent(notification, "test")
   return { result }
 }

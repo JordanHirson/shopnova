@@ -59,6 +59,9 @@
 - [x] Provider registry (`features/payment/provider-registry.ts`) — only configured gateways are selectable
 - [x] Stripe adapter (`features/payment/stripe.ts`) — hosted Checkout Sessions, HMAC-SHA256 webhook verification
 - [x] PayFast adapter (`features/payment/payfast.ts`) — hosted form, MD5 ITN signature verification
+- [x] Yoco adapter (`features/payment/yoco.ts`) — hosted Checkout API (`payments.yoco.com/api/checkouts`), Standard Webhooks webhook verification (`webhook-*` headers, shared `standard-webhooks.ts` verifier). Implemented per the official public API contract; unit-tested against real signature math with mocked `fetch`; NOT exercised against the live Yoco API.
+- [~] Stitch adapter (`features/payment/stitch.ts`) — Svix/Standard Webhooks webhook verification (`svix-*` headers) + OAuth 2.0 client-credentials token helper implemented and tested; hosted-payment-session creation flow (the `clientPaymentInitiationRequestCreate` GraphQL mutation) is pending the official input contract. `isConfigured()` returns false until then, so Stitch is never selectable by checkout.
+- [x] Standard Webhooks verifier (`features/payment/standard-webhooks.ts`) — dependency-free (Node `crypto` only) implementation shared by Yoco + Stitch/Svix: `whsec_` secret prefix + base64 decode, HMAC-SHA256 over `id.timestamp.body`, constant-time compare, `v1,<sig>` list parsing with key-rotation support, replay protection (180s default, 3600s max), 1 MiB body guard.
 - [x] Test/mock adapter (`features/payment/test.ts`) — signed mock gateway for local dev + tests
 - [x] Test provider gated to non-production (never registered in `NODE_ENV=production`)
 - [x] Payment business logic (`features/payment/payment-logic.ts`) — provider selection, authoritative-amount guards
@@ -70,15 +73,18 @@
 - [x] Raw card data never touches ShopNova servers (hosted Stripe Checkout / PayFast form / mock page)
 - [x] `startCheckoutPaymentAction` server action — validates form, creates intent, selects provider server-side, returns redirect URL
 - [x] `completeTestPaymentAction` server action — mock verified callback for the Test gateway
-- [x] Webhook API routes: `/api/webhooks/stripe`, `/api/webhooks/payfast`, `/api/webhooks/test`
+- [x] Webhook API routes: `/api/webhooks/stripe`, `/api/webhooks/payfast`, `/api/webhooks/yoco`, `/api/webhooks/stitch`, `/api/webhooks/test`
 - [x] Shared webhook handler (`features/payment/webhook-handler.ts`) with correct HTTP status codes
+- [x] Provider-match security check (`isProviderMatch` in `payment-logic.ts`) — a verified notification from gateway X cannot complete a `CheckoutIntent` created for gateway Y; enforced in `completePaidIntent` (returns `provider-mismatch`, HTTP 400) in addition to provider-scoped routes + per-adapter signature verification
 - [x] Mock hosted payment page (`/checkout/test-pay`) for local end-to-end verification
 - [x] Checkout view wired to the payment-gated flow (redirect to hosted payment UI)
 - [x] `/checkout/success` updated to reflect paid (CONFIRMED) vs pending status
 - [x] Removed dead code: `placeOrderAction` and `createOrder` (replaced by intent-based flow)
 - [x] Unit tests for payment logic (11 tests) — authoritative amount, provider selection, provider resolution
 - [x] Unit tests for webhook verification (15 tests) — valid/invalid/missing signatures, failed payments, ignored events, PayFast MD5 stability
-- [x] Test runner loader shim for `server-only` (`scripts/test-register.mjs` + `test-loader.mjs`)
+- [x] Unit tests for the Standard Webhooks verifier (16 tests) — valid Yoco `webhook-*` + Stitch `svix-*` signatures, byte-exact body, wrong secret, missing headers, non-v1 entries, key rotation, replay/timestamp tolerance, 3600s max, non-numeric timestamp, `whsec_` prefix, empty secret, 1 MiB body guard, header-prefix isolation
+- [x] Unit tests for Yoco + Stitch provider behavior (22 tests) — `createSession` request/response contract (mocked `fetch`), non-OK/no-redirect failures, `payment.succeeded`/`payment.failed`/unhandled events, invalid/missing/replayed signatures, malformed body, wrong-provider intent passthrough; Stitch `isConfigured === false`, `createSession` pending error, Completed/Cancelled/Expired/Pending states, Svix idempotency key, amount parsing, missing node
+- [x] Test runner loader shim for `server-only` + extensionless relative `.ts` import retry (`scripts/test-register.mjs` + `test-loader.mjs`)
 
 ## Product Search
 
@@ -164,7 +170,7 @@ No MVP requirement is known to be unimplemented. These are genuine limitations o
 
 - [x] **Redis cart store (Post-MVP #1)** — `RedisCartStore` backed by Upstash Redis (REST API) with a 30-day TTL, behind the existing provider-agnostic `CartStore` abstraction. Configure `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN`; production fails fast with `CartConfigurationError` when these are absent (no silent in-memory fallback). Development falls back to `MemoryCartStore` when Redis is not configured.
 - [~] **Live courier API integration (Post-MVP #2)** — `ShippingProvider` abstraction + registry complete; checkout now obtains an authoritative server-side shipping quote from the destination. No live courier adapter is wired yet (official API contracts/credentials unavailable); the deterministic MVP provider remains the documented fallback. Bob Go / Aramex / PUDO / The Courier Guy adapters are the remaining work.
-- [ ] Additional payment gateways: Yoco, Stitch (provider abstraction supports them)
+- [~] Additional payment gateways: Yoco (implemented + tested, pending live-API verification), Stitch (Svix webhook verification + OAuth token helper implemented + tested; hosted-session creation flow pending the `clientPaymentInitiationRequestCreate` GraphQL mutation contract)
 - [ ] AI/LLM features and agents
 - [ ] pgvector semantic/vector search; PostgreSQL full-text (`tsvector`) and trigram (`pg_trgm`) search
 - [ ] Product federation / marketplace integrations (Shopify, Amazon, Takealot, AliExpress)

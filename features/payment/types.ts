@@ -3,13 +3,13 @@
  *
  * The guidebook requires a clean payment-provider abstraction so Stripe
  * and PayFast do not become tightly coupled to checkout business logic,
- * and additional gateways (Yoco, Stitch later) can drop in behind the
- * same interface. Raw card data NEVER touches ShopNova servers — both
- * providers redirect the customer to their hosted/embedded payment UI.
+ * and additional gateways (Yoco, Stitch) can drop in behind the same
+ * interface. Raw card data NEVER touches ShopNova servers — every
+ * provider redirects the customer to its hosted/embedded payment UI.
  */
 
 /** Provider identifiers known to the platform today. */
-export type PaymentProviderId = "stripe" | "payfast" | "test"
+export type PaymentProviderId = "stripe" | "payfast" | "yoco" | "stitch" | "test"
 
 /**
  * A payment-orderable snapshot the provider needs to redirect the

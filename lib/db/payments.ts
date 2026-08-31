@@ -26,7 +26,7 @@ import {
 import type { PaymentNotification, PaymentProviderId } from "@/features/payment/types"
 import { cartStore } from "@/features/cart/cart-store"
 import { clerkUserIdFromShopperId } from "@/features/account/account-logic"
-import { amountMatches, currencyMatches } from "@/features/payment/payment-logic"
+import { amountMatches, currencyMatches, isProviderMatch } from "@/features/payment/payment-logic"
 import {
   getAuthoritativeShippingQuote,
   getShippingOrigin,
@@ -65,6 +65,7 @@ export type PaymentCompletionResult =
   | { status: "duplicate"; orderNumber?: string }
   | { status: "not-found" }
   | { status: "amount-mismatch" }
+  | { status: "provider-mismatch" }
   | { status: "failed" }
 
 /**
@@ -180,7 +181,8 @@ export async function getIntentById(intentId: string) {
  * makes duplicate webhook deliveries idempotent.
  */
 export async function completePaidIntent(
-  notification: PaymentNotification
+  notification: PaymentNotification,
+  providerId?: PaymentProviderId
 ): Promise<PaymentCompletionResult> {
   // Find the intent the gateway round-tripped in its metadata/reference.
   const intent = notification.intentId
@@ -192,6 +194,14 @@ export async function completePaidIntent(
       })
 
   if (!intent) return { status: "not-found" }
+
+  // Provider-specific webhook processing: a verified notification from
+  // gateway X must never complete a CheckoutIntent created for gateway Y.
+  // This is enforced in addition to each route being provider-scoped and
+  // each adapter verifying its own signature — defence in depth.
+  if (providerId && !isProviderMatch(intent.provider, providerId)) {
+    return { status: "provider-mismatch" }
+  }
 
   // Already completed by the same payload => safe duplicate to the gateway.
   if (intent.completedPayloadKey === notification.payloadKey) {
