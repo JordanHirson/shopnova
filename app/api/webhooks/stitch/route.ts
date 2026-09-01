@@ -7,12 +7,13 @@
  * the Standard Webhooks scheme) before anything is acted on. The browser
  * redirect is never trusted. Duplicate deliveries are idempotent.
  *
- * NOTE: the Stitch hosted-payment-session creation flow is pending the
- * official `clientPaymentInitiationRequestCreate` GraphQL mutation contract,
- * so `StitchProvider.isConfigured()` currently returns false and this route
- * responds `provider_not_configured` until that contract is wired up. The
- * route + Svix verification are in place and tested so the integration is a
- * one-line flip once the creation flow is implemented.
+ * NOTE: the Stitch hosted-payment-session creation flow is now implemented
+ * against the official `clientPaymentInitiationRequestCreate` GraphQL
+ * mutation contract. `StitchProvider.isConfigured()` returns true when
+ * `STITCH_CLIENT_ID`, `STITCH_CLIENT_SECRET`, and `STITCH_WEBHOOK_SECRET`
+ * are all present, so this route processes real Stitch webhook deliveries
+ * when the provider is configured. When the credentials are absent the route
+ * responds `provider_not_configured`.
  */
 import { handleProviderWebhook, normalizeHeaders } from "@/features/payment/webhook-handler"
 

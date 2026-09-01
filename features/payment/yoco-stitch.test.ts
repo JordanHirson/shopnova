@@ -259,6 +259,26 @@ async function importStitch() {
   return import("./stitch.ts")
 }
 
+/**
+ * Imports the Stitch module fresh (cache-busted) with a given env overlay so
+ * the module-level `process.env` reads re-run. Used to exercise the
+ * not-configured paths — the provider captures credentials at module load,
+ * matching Yoco, so post-import env mutation would not be observed.
+ */
+async function importStitchFresh(env: Record<string, string | undefined>) {
+  const saved = { ...process.env }
+  for (const [k, v] of Object.entries(env)) {
+    if (v === undefined) delete process.env[k]
+    else process.env[k] = v
+  }
+  try {
+    const url = new URL(`./stitch.ts?fresh=${Math.random()}`, import.meta.url)
+    return (await import(url.href)) as typeof import("./stitch.ts")
+  } finally {
+    process.env = saved
+  }
+}
+
 function stitchEventBody(overrides: {
   state?: string
   externalReference?: string
@@ -270,7 +290,9 @@ function stitchEventBody(overrides: {
     id: overrides.id ?? "cGF5cmVxLzEyMw==",
     externalReference: overrides.externalReference ?? "intent-stitch-1",
     currency: "ZAR",
-    amount: overrides.amount ?? { currency: "ZAR", quantity: "11500" },
+    // Stitch `amount.quantity` is a Decimal in MAJOR units (Rand), not cents.
+    // R115.00 == 11500 cents (matches the sample order amountCents).
+    amount: overrides.amount ?? { currency: "ZAR", quantity: "115.00" },
     state: { __typename: overrides.state ?? "PaymentInitiationRequestCompleted" },
   }
   return JSON.stringify({
@@ -283,17 +305,278 @@ function stitchSigned(body: string, id = "msg_1") {
   return webhookHeaders("svix", signature, id)
 }
 
-test("Stitch: isConfigured is false (hosted-session creation is pending)", async () => {
+test("Stitch: isConfigured is true when all credentials are present", async () => {
   const { StitchProvider } = await importStitch()
-  assert.equal(new StitchProvider().isConfigured(), false)
+  assert.equal(new StitchProvider().isConfigured(), true)
 })
 
-test("Stitch: createSession throws a clear pending error", async () => {
+test("Stitch: isConfigured is false when any credential is missing", async () => {
+  const base = {
+    STITCH_CLIENT_ID: "stitch_client_unit",
+    STITCH_CLIENT_SECRET: "stitch_secret_unit",
+    STITCH_WEBHOOK_SECRET: WEBHOOK_SECRET,
+  }
+  for (const missing of Object.keys(base)) {
+    const env = { ...base, [missing]: undefined }
+    const { StitchProvider } = await importStitchFresh(env)
+    assert.equal(
+      new StitchProvider().isConfigured(),
+      false,
+      `isConfigured should be false when ${missing} is missing`
+    )
+  }
+})
+
+test("Stitch: createSession posts the GraphQL mutation and returns the hosted url with redirect params", async () => {
   const { StitchProvider } = await importStitch()
-  await assert.rejects(
-    new StitchProvider().createSession(sampleOrder()),
-    /Stitch hosted-payment-session creation is not implemented/
+  const provider = new StitchProvider()
+  const originalFetch = globalThis.fetch
+
+  let capturedUrl = ""
+  let capturedInit: RequestInit | undefined
+  globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
+    // The first call is the OAuth token request; the second is the GraphQL
+    // mutation. Capture the GraphQL call (the one whose body is JSON with a
+    // `query` field).
+    const body = init?.body
+    if (typeof body === "string" && body.includes("clientPaymentInitiationRequestCreate")) {
+      capturedUrl = typeof input === "string" ? input : input.toString()
+      capturedInit = init
+      return new Response(
+        JSON.stringify({
+          data: {
+            clientPaymentInitiationRequestCreate: {
+              paymentInitiationRequest: {
+                id: "cGF5cmVxLzEyMw==",
+                url: "https://secure.stitch.money/connect/payment-request/abc-123",
+              },
+            },
+          },
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    }
+    // Token endpoint.
+    return new Response(JSON.stringify({ access_token: "tok_unit" }), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    })
+  }) as typeof fetch
+
+  try {
+    const order = sampleOrder("intent-stitch-create")
+    // Stitch is SA Pay By Bank; point the notify url at the stitch webhook.
+    order.notifyUrl = "https://example.com/api/webhooks/stitch"
+    const session = await provider.createSession(order)
+
+    assert.equal(session.provider, "stitch")
+    assert.equal(session.providerReference, "cGF5cmVxLzEyMw==")
+
+    // redirect_uri (success) + failure_redirect_uri (cancel) appended.
+    assert.match(session.redirectUrl, /^https:\/\/secure\.stitch\.money\/connect\/payment-request\/abc-123\?/)
+    assert.match(session.redirectUrl, /redirect_uri=https%3A%2F%2Fexample\.com%2Fcheckout%2Fsuccess/)
+    assert.match(session.redirectUrl, /failure_redirect_uri=https%3A%2F%2Fexample\.com%2Fcheckout%3Fcanceled%3D1/)
+
+    // GraphQL request contract.
+    assert.equal(capturedUrl, "https://api.stitch.money/graphql")
+    const headers = new Headers(capturedInit!.headers as HeadersInit)
+    assert.equal(headers.get("Authorization"), "Bearer tok_unit")
+    assert.equal(headers.get("Content-Type"), "application/json")
+    assert.equal(headers.get("Idempotency-Key"), "intent-stitch-create")
+
+    const body = JSON.parse(String(capturedInit!.body))
+    assert.match(body.query, /clientPaymentInitiationRequestCreate\(input: \$input\)/)
+    assert.match(body.query, /paymentInitiationRequest \{ id url \}/)
+
+    const input = body.variables.input
+    // Amount in MAJOR units (Rand), not cents.
+    assert.equal(input.amount.quantity, "115.00")
+    assert.equal(input.amount.currency, "ZAR")
+    // externalReference is the intent id (webhook correlation key).
+    assert.equal(input.externalReference, "intent-stitch-create")
+    // Bank-statement references within documented limits.
+    assert.ok(input.payerReference.length <= 12, "payerReference <= 12 chars")
+    assert.ok(input.beneficiaryReference.length <= 20, "beneficiaryReference <= 20 chars")
+    // payerId recommended for fraud checks.
+    assert.equal(input.payerInformation.payerId, "shopper@example.com")
+    // expireAt is an ISO 8601 datetime.
+    assert.ok(!Number.isNaN(Date.parse(input.expireAt)))
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("Stitch: createSession throws on a non-OK HTTP response", async () => {
+  const { StitchProvider } = await importStitch()
+  const provider = new StitchProvider()
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
+    const body = init?.body
+    if (typeof body === "string" && body.includes("clientPaymentInitiationRequestCreate")) {
+      return new Response('{"error":"bad"}', { status: 502 })
+    }
+    return new Response(JSON.stringify({ access_token: "tok_unit" }), { status: 200 })
+  }) as typeof fetch
+
+  try {
+    await assert.rejects(provider.createSession(sampleOrder()), /Stitch session creation failed: 502/)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("Stitch: createSession throws on a GraphQL errors array", async () => {
+  const { StitchProvider } = await importStitch()
+  const provider = new StitchProvider()
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
+    const body = init?.body
+    if (typeof body === "string" && body.includes("clientPaymentInitiationRequestCreate")) {
+      return new Response(
+        JSON.stringify({
+          data: null,
+          errors: [
+            {
+              message: "This idempotency key has already been used for a different request.",
+              extensions: { code: "IDEMPOTENCY_KEY_ALREADY_USED" },
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } }
+      )
+    }
+    return new Response(JSON.stringify({ access_token: "tok_unit" }), { status: 200 })
+  }) as typeof fetch
+
+  try {
+    await assert.rejects(
+      provider.createSession(sampleOrder()),
+      /IDEMPOTENCY_KEY_ALREADY_USED/
+    )
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("Stitch: createSession throws when the response has no payment request id", async () => {
+  const { StitchProvider } = await importStitch()
+  const provider = new StitchProvider()
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
+    const body = init?.body
+    if (typeof body === "string" && body.includes("clientPaymentInitiationRequestCreate")) {
+      return new Response(
+        JSON.stringify({
+          data: { clientPaymentInitiationRequestCreate: { paymentInitiationRequest: { id: "", url: "https://x" } } },
+        }),
+        { status: 200 }
+      )
+    }
+    return new Response(JSON.stringify({ access_token: "tok_unit" }), { status: 200 })
+  }) as typeof fetch
+
+  try {
+    await assert.rejects(provider.createSession(sampleOrder()), /did not include a payment request id/)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("Stitch: createSession throws when the response has no hosted url", async () => {
+  const { StitchProvider } = await importStitch()
+  const provider = new StitchProvider()
+  const originalFetch = globalThis.fetch
+  globalThis.fetch = (async (input: string | URL, init?: RequestInit) => {
+    const body = init?.body
+    if (typeof body === "string" && body.includes("clientPaymentInitiationRequestCreate")) {
+      return new Response(
+        JSON.stringify({
+          data: { clientPaymentInitiationRequestCreate: { paymentInitiationRequest: { id: "id_1", url: "" } } },
+        }),
+        { status: 200 }
+      )
+    }
+    return new Response(JSON.stringify({ access_token: "tok_unit" }), { status: 200 })
+  }) as typeof fetch
+
+  try {
+    await assert.rejects(provider.createSession(sampleOrder()), /did not include a hosted payment url/)
+  } finally {
+    globalThis.fetch = originalFetch
+  }
+})
+
+test("Stitch: createSession refuses when not configured", async () => {
+  const { StitchProvider } = await importStitchFresh({
+    STITCH_CLIENT_ID: undefined,
+    STITCH_CLIENT_SECRET: "stitch_secret_unit",
+    STITCH_WEBHOOK_SECRET: WEBHOOK_SECRET,
+  })
+  await assert.rejects(new StitchProvider().createSession(sampleOrder()), /Stitch is not configured/)
+})
+
+// ── Stitch pure helpers ─────────────────────────
+
+test("Stitch centsToStitchMajorUnits: cents -> major-unit Decimal string", async () => {
+  const { centsToStitchMajorUnits } = await importStitch()
+  assert.equal(centsToStitchMajorUnits(11500), "115.00")
+  assert.equal(centsToStitchMajorUnits(11523), "115.23")
+  assert.equal(centsToStitchMajorUnits(5), "0.05")
+  assert.equal(centsToStitchMajorUnits(0), "0.00")
+  assert.equal(centsToStitchMajorUnits(100), "1.00")
+  // Rounds half-up on bad input.
+  assert.equal(centsToStitchMajorUnits(11500.4), "115.00")
+  assert.equal(centsToStitchMajorUnits(11500.6), "115.01")
+})
+
+test("Stitch majorUnitsToCents: major-unit Decimal -> cents (round trip)", async () => {
+  const { majorUnitsToCents, centsToStitchMajorUnits } = await importStitch()
+  assert.equal(majorUnitsToCents("115.00"), 11500)
+  assert.equal(majorUnitsToCents("100.23"), 10023)
+  assert.equal(majorUnitsToCents(100), 10000)
+  assert.equal(majorUnitsToCents("0.05"), 5)
+  // Missing / non-finite -> 0 (guard fails closed downstream).
+  assert.equal(majorUnitsToCents(undefined), 0)
+  assert.equal(majorUnitsToCents(null), 0)
+  assert.equal(majorUnitsToCents("not-a-number"), 0)
+  // Round trip preserves the exact cents value.
+  for (const cents of [0, 1, 5, 99, 100, 11500, 11523, 999999]) {
+    assert.equal(majorUnitsToCents(centsToStitchMajorUnits(cents)), cents)
+  }
+})
+
+test("Stitch stitchReference: sanitizes + truncates within documented limits", async () => {
+  const { stitchReference } = await importStitch()
+  const order = "SN-20260831-000001"
+  // Alphanumeric only; fits within 20.
+  assert.equal(stitchReference(order, 20), "SN20260831000001")
+  // Truncated to 12 preserves the unique trailing suffix.
+  assert.equal(stitchReference(order, 12), "260831000001")
+  assert.equal(stitchReference(order, 12).length, 12)
+  // Short input is kept as-is.
+  assert.equal(stitchReference("A1", 12), "A1")
+  // Empty / non-alphanumeric input falls back to a static placeholder.
+  assert.equal(stitchReference("---", 12), "SHOPNOVA")
+  assert.equal(stitchReference("", 8), "SHOPNOVA")
+})
+
+test("Stitch buildStitchRedirectUrl: appends encoded redirect + failure params", async () => {
+  const { buildStitchRedirectUrl } = await importStitch()
+  const out = buildStitchRedirectUrl(
+    "https://secure.stitch.money/connect/payment-request/abc",
+    "https://example.com/checkout/success?orderNumber=SN-1",
+    "https://example.com/checkout?canceled=1"
   )
+  assert.match(out, /^https:\/\/secure\.stitch\.money\/connect\/payment-request\/abc\?/)
+  assert.match(out, /redirect_uri=https%3A%2F%2Fexample\.com%2Fcheckout%2Fsuccess%3ForderNumber%3DSN-1/)
+  assert.match(out, /failure_redirect_uri=https%3A%2F%2Fexample\.com%2Fcheckout%3Fcanceled%3D1/)
+  // Without a cancel url, only redirect_uri is appended.
+  const out2 = buildStitchRedirectUrl("https://x/y", "https://example.com/s")
+  assert.match(out2, /\?redirect_uri=/)
+  assert.doesNotMatch(out2, /failure_redirect_uri/)
+  // A url that already has a query string uses '&' not '?'.
+  const out3 = buildStitchRedirectUrl("https://x/y?z=1", "https://example.com/s")
+  assert.match(out3, /\?z=1&redirect_uri=/)
 })
 
 test("Stitch: a valid PaymentInitiationRequestCompleted webhook returns a success notification", async () => {
@@ -385,11 +668,12 @@ test("Stitch: a delivery without a payment-initiation node is ignored", async ()
   assert.equal(notification, null)
 })
 
-test("Stitch: amount quantity is parsed as minor units (cents) from a string", async () => {
+test("Stitch: amount quantity (major units / Rand) is converted to cents", async () => {
   const { StitchProvider } = await importStitch()
   const provider = new StitchProvider()
 
-  const body = stitchEventBody({ amount: { currency: "ZAR", quantity: "1999" } })
+  // R19.99 -> 1999 cents.
+  const body = stitchEventBody({ amount: { currency: "ZAR", quantity: "19.99" } })
   const notification = await provider.handleWebhook(body, stitchSigned(body), {})
   assert.equal(notification?.amountMinor, 1999)
 })

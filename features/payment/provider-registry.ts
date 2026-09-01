@@ -19,15 +19,15 @@ import { TestProvider } from "./test"
  * Builds the provider list available for the current server environment.
  *
  * Every gateway is constructed lazily with its server-side configuration; an
- * unconfigured gateway (missing secret keys, or — for Stitch — a hosted-
- * session creation flow that is still pending) simply returns false from
+ * unconfigured gateway (missing secret keys) simply returns false from
  * `isConfigured()` and can never be selected by a client.
  *
  * The mock TestProvider is only registered outside production so a real
  * deployment can never accidentally route a checkout through the fake
- * gateway. In production, only Stripe / PayFast / Yoco (when their
- * server-side credentials are present) are selectable; Stitch is pending its
- * hosted-session creation contract and reports `isConfigured() === false`.
+ * gateway. In production, Stripe / PayFast / Yoco / Stitch are selectable
+ * when their server-side credentials are present. Checkout routing still
+ * defaults to PayFast (SA) / Stripe (international); Yoco and Stitch are
+ * selectable when explicitly requested and configured.
  */
 export function getConfiguredProviders(): PaymentProvider[] {
   const providers: PaymentProvider[] = [
