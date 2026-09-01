@@ -19,12 +19,11 @@
  *   existing MVP shipping behavior exactly.
  *
  * LIVE COURIER STATUS:
- * No live courier adapter is implemented yet — official API contracts and
- * credentials are not available in this environment, and the guidebook
- * forbids inventing API endpoints/auth/response shapes. The abstraction and
- * registry are production-ready; adding a courier is a one-line registration
- * in `LIVE_COURIER_FACTORIES` once its adapter + server-side credentials
- * exist. See `.env.example` for the intended credential variables.
+ * Bob Go (the guidebook's multi-courier API) is implemented and registered
+ * below — it is selected only when `BOBGO_API_KEY` is present. Aramex, PUDO,
+ * and The Courier Guy adapters remain pending official API contracts /
+ * credentials. The deterministic `MvpShippingProvider` stays the documented
+ * fallback when NO live courier is configured.
  */
 import "server-only"
 
@@ -36,6 +35,7 @@ import type {
 } from "./shipping-provider"
 import { MvpShippingProvider } from "./shipping-provider.ts"
 import { normalizeQuote, selectCheapestQuote } from "./shipping-logic.ts"
+import { BobGoProvider } from "./couriers/bobgo.ts"
 
 // ── Origin configuration ──────────────────────
 
@@ -92,7 +92,9 @@ export function getShippingOrigin(
  *   () => new BobGoProvider(),
  */
 const LIVE_COURIER_FACTORIES: Array<() => ShippingProvider | null> = [
-  // () => new BobGoProvider(),
+  // Bob Go (multi-courier aggregator) — registered only when BOBGO_API_KEY is
+  // present. Uses the sandbox base URL when BOBGO_TEST_MODE=true.
+  () => new BobGoProvider(),
   // () => new AramexProvider(),
   // () => new PudoProvider(),
   // () => new CourierGuyProvider(),
