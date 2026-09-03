@@ -43,6 +43,9 @@ function serializeProduct(product: Awaited<ReturnType<typeof listProducts>>[numb
     lengthCm: product.lengthCm,
     widthCm: product.widthCm,
     heightCm: product.heightCm,
+    federation: product.federation
+      ? { id: product.federation.id, name: product.federation.name, source: product.federation.source }
+      : null,
   }
 }
 
@@ -88,7 +91,16 @@ export default async function ProductsPage() {
                 const stock = product.inventory?.quantity ?? null
                 return (
                   <TableRow key={product.id} className={product.archived ? "opacity-60" : undefined}>
-                    <TableCell className="font-medium">{product.name}</TableCell>
+                    <TableCell className="font-medium">
+                      <div className="flex flex-col gap-1">
+                        {product.name}
+                        {product.federation && (
+                          <span className="inline-flex w-fit items-center rounded-full bg-violet-500/10 px-2 py-0.5 text-xs font-medium text-violet-700 dark:text-violet-400">
+                            Federated · {product.federation.source}
+                          </span>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell className="text-muted-foreground">
                       {product.sku || "—"}
                     </TableCell>

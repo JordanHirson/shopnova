@@ -58,10 +58,11 @@ model Store {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  categories Category[]
-  products   Product[]
-  customers  Customer[]
-  orders     Order[]
+  categories  Category[]
+  products    Product[]
+  customers   Customer[]
+  orders      Order[]
+  federations FederationLink[]
 
   @@map("stores")
 }
@@ -115,6 +116,16 @@ model Product {
   categoryId String   @db.Uuid
   category   Category @relation(fields: [categoryId], references: [id], onDelete: Restrict)
 
+  // ── Catalog Federation (GUIDEBOOK §8) ──
+  // `federationLinkId` ties a product to the external source it was imported
+  // from; `externalId` is the upstream store's product id used to diff during
+  // sync runs. Both nullable so manually-created products remain valid. If the
+  // link is deleted the product is retained (SetNull) so historical orders stay
+  // intact — mirroring the soft-delete policy for archived products.
+  federationLinkId String? @db.Uuid
+  federation       FederationLink? @relation(fields: [federationLinkId], references: [id], onDelete: SetNull)
+  externalId       String? @db.VarChar(255)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -127,6 +138,7 @@ model Product {
   @@index([storeId])
   @@index([categoryId])
   @@index([archived])
+  @@index([federationLinkId])
   @@map("products")
 }
 
@@ -321,4 +333,60 @@ model Inventory {
 
   @@index([productId])
   @@map("inventory")
+}
+
+// ============================================================
+//  CATALOG FEDERATION (GUIDEBOOK §8)
+//  Links an external store (Shopify/Amazon/etc.) so its products
+//  can be imported, marked up, and resold with auto-sync.
+// ============================================================
+
+model FederationLink {
+  id      String @id @default(uuid()) @db.Uuid
+  storeId String @db.Uuid
+  store   Store  @relation(fields: [storeId], references: [id], onDelete: Cascade)
+
+  // 'shopify' | 'amazon' | 'takealot' | 'aliexpress' | 'csv'
+  source String @db.VarChar(50)
+
+  // Friendly display name (e.g. "Acme Shopify Outlet")
+  name String @db.VarChar(255)
+
+  // Credentials (encrypted in production) + filters + markup rule + sync
+  // interval. Shape (typed in lib/db/federation.ts):
+  //   { markup: { type: 'percentage'|'fixed', value: number },
+  //     syncIntervalMinutes: number,
+  //     filters?: { collections?: string[] } }
+  config Json
+
+  lastSyncedAt DateTime?
+  errorMessage String? @db.Text
+
+  products Product[]
+  syncRuns FederationSyncRun[]
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([storeId])
+  @@map("federation_links")
+}
+
+model FederationSyncRun {
+  id               String   @id @default(uuid()) @db.Uuid
+  federationLinkId String   @db.Uuid
+  link             FederationLink @relation(fields: [federationLinkId], references: [id], onDelete: Cascade)
+
+  // RUNNING | SUCCESS | FAILED
+  status          String @db.VarChar(20)
+  productsCreated Int    @default(0)
+  productsUpdated Int    @default(0)
+  productsRemoved Int    @default(0)
+  errors          Json?
+
+  startedAt DateTime @default(now())
+  endedAt   DateTime?
+
+  @@index([federationLinkId])
+  @@map("federation_sync_runs")
 }

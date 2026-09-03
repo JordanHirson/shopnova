@@ -55,6 +55,7 @@ export async function listProducts() {
       category: { select: { id: true, name: true } },
       inventory: { select: { id: true, quantity: true, lowStockThreshold: true } },
       images: { orderBy: { sortOrder: "asc" }, take: 1 },
+      federation: { select: { id: true, name: true, source: true } },
     },
   })
 }
@@ -89,6 +90,7 @@ export async function getProductBySlug(slug: string) {
     include: {
       category: { select: { id: true, name: true, slug: true } },
       images: { orderBy: { sortOrder: "asc" } },
+      federation: { select: { id: true, name: true, source: true } },
     },
   })
 }

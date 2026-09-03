@@ -61,6 +61,7 @@ interface Product {
   lengthCm: number | null
   widthCm: number | null
   heightCm: number | null
+  federation: { id: string; name: string; source: string } | null
 }
 
 interface Category {

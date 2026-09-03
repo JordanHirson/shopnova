@@ -87,6 +87,11 @@ export default async function ProductDetailsPage({
                 {product.description}
               </p>
             )}
+            {product.federation && (
+              <p className="inline-flex w-fit items-center rounded-md bg-violet-500/10 px-2 py-1 text-xs font-medium text-violet-700 dark:text-violet-400">
+                Shipped by a partner · via {product.federation.source}
+              </p>
+            )}
             <dl className="flex flex-col gap-2 border-t pt-4 text-sm">
               <div className="flex justify-between gap-4">
                 <dt className="text-muted-foreground">Category</dt>
