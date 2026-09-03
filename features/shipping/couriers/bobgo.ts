@@ -61,11 +61,17 @@
  *   credential-free message; the original error is preserved on `cause` for
  *   server-side diagnostics and never exposed to the browser.
  *
- * STATUS: implemented per the official public API contract and unit-tested
+ * STATUS: implemented per the official public API contract, unit-tested
  * with mocked `fetch` (request/response contract, error paths, malformed
- * responses, currency mismatch, multi-shape response parsing). NOT exercised
- * against the live Bob Go sandbox (no `BOBGO_API_KEY` in this environment);
- * live-API verification remains pending real credentials.
+ * responses, currency mismatch, multi-shape response parsing), and
+ * LIVE-SANDBOX-VERIFIED: a real non-destructive `POST /rates` against
+ * `https://api.sandbox.bobgo.co.za/v2` (Cape Town -> Johannesburg, default
+ * 1 kg / 30x20x10 cm parcel, ZAR subtotal) returned real ZAR rates that
+ * normalized correctly into `ShippingQuote` and flowed through the registry
+ * + checkout path. No API discrepancy was found; no application code was
+ * changed for the live test. NOT production-verified (the production base
+ * URL has not been exercised, and per-product weight/dimensions remain a
+ * documented approximation).
  */
 import "server-only"
 
