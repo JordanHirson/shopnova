@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Plus, Pencil, Trash2, RotateCcw } from "lucide-react"
+import { Plus, Pencil, Trash2, RotateCcw, Sparkles, Loader2 } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -66,6 +66,7 @@ interface Product {
 interface Category {
   id: string
   name: string
+  slug: string
 }
 
 interface ProductFormProps {
@@ -78,6 +79,8 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
   const [open, setOpen] = useState(false)
   const [error, setError] = useState<string | undefined>()
   const [isPending, startTransition] = useTransition()
+  const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [aiError, setAiError] = useState<string | undefined>()
   const isEdit = Boolean(product)
 
   const action = isEdit ? updateProductAction : createProductAction
@@ -114,6 +117,78 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
     })
   }
 
+  /** Converts a title into a URL-friendly slug matching the validation regex. */
+  function slugify(value: string): string {
+    return value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+  }
+
+  /**
+   * Calls the AI generate-product endpoint with the current keywords/image
+   * and autofills the form fields. Generated tags are folded into the
+   * description (the Product model has no tags column) so the merchant can
+   * review and edit everything before saving.
+   */
+  async function handleAiAutofill() {
+    setAiError(undefined)
+    setIsAnalyzing(true)
+    try {
+      const keywords = [
+        form.getValues("name"),
+        form.getValues("description"),
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .trim()
+
+      const imageUrl = form.getValues("imageUrl") ?? ""
+
+      const res = await fetch("/api/ai/generate-product", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          keywords: keywords || undefined,
+          imageUrl: imageUrl || undefined,
+        }),
+      })
+
+      if (!res.ok) {
+        const body = (await res.json().catch(() => null)) as { error?: string } | null
+        throw new Error(body?.error ?? "AI generation failed.")
+      }
+
+      const data = (await res.json()) as {
+        title: string
+        description: string
+        tags: string[]
+        suggestedPrice: string
+        categorySlug: string
+      }
+
+      const matchedCategory = categories.find((c) => c.slug === data.categorySlug)
+
+      const descriptionWithTags =
+        data.tags.length > 0
+          ? `${data.description}\n\nTags: ${data.tags.join(", ")}`
+          : data.description
+
+      form.setValue("name", data.title, { shouldValidate: true })
+      form.setValue("slug", slugify(data.title), { shouldValidate: true })
+      form.setValue("description", descriptionWithTags, { shouldValidate: true })
+      form.setValue("price", data.suggestedPrice, { shouldValidate: true })
+      if (matchedCategory) {
+        form.setValue("categoryId", matchedCategory.id, { shouldValidate: true })
+      }
+    } catch (err) {
+      setAiError(err instanceof Error ? err.message : "AI generation failed.")
+    } finally {
+      setIsAnalyzing(false)
+    }
+  }
+
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger
@@ -124,7 +199,7 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
           </Button>
         }
       />
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="flex max-h-[calc(100dvh-2rem)] flex-col overflow-hidden sm:max-w-lg">
         <DialogHeader>
           <DialogTitle>{isEdit ? "Edit Product" : "Create Product"}</DialogTitle>
           <DialogDescription>
@@ -133,9 +208,9 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
               : "Add a new product to your catalog."}
           </DialogDescription>
         </DialogHeader>
-        <form action={handleSubmit}>
+        <form action={handleSubmit} className="flex min-h-0 flex-1 flex-col overflow-hidden">
           {isEdit && <input type="hidden" name="id" value={product!.id} />}
-          <div className="grid gap-4">
+          <div className="grid min-h-0 flex-1 gap-4 overflow-y-auto pr-1">
             <Form {...form}>
               <FormField
                 control={form.control}
@@ -218,7 +293,23 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
                 name="imageUrl"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel>Image URL</FormLabel>
+                    <div className="flex items-center justify-between gap-2">
+                      <FormLabel>Image URL</FormLabel>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="xs"
+                        disabled={isAnalyzing || isPending}
+                        onClick={handleAiAutofill}
+                      >
+                        {isAnalyzing ? (
+                          <Loader2 className="animate-spin" />
+                        ) : (
+                          <Sparkles />
+                        )}
+                        {isAnalyzing ? "Analyzing product visual..." : "AI Autofill"}
+                      </Button>
+                    </div>
                     <FormControl>
                       <Input
                         placeholder="https://example.com/image.jpg"
@@ -226,10 +317,15 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
                         value={field.value ?? ""}
                       />
                     </FormControl>
+                    <p className="text-xs text-muted-foreground">
+                      Add a product photo URL or a few keywords above, then let
+                      AI draft the title, description, category, and tags.
+                    </p>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              {aiError && <p className="text-sm text-destructive">{aiError}</p>}
               <div className="grid gap-4 sm:grid-cols-2">
                 <FormField
                   control={form.control}
@@ -393,7 +489,7 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
             </Form>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>
-          <DialogFooter className="mt-4">
+          <DialogFooter className="shrink-0">
             <Button type="submit" disabled={isPending}>
               {isPending ? "Saving..." : isEdit ? "Save Changes" : "Create Product"}
             </Button>

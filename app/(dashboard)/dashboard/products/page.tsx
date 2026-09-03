@@ -14,6 +14,38 @@ import { ProductForm, DeleteProductButton, RestoreProductButton } from "./produc
 
 export const dynamic = "force-dynamic"
 
+/**
+ * Strips Prisma `Decimal` objects from a product so it can be passed to a
+ * Client Component. Next.js only allows plain objects across the Server →
+ * Client boundary; `Decimal` is a class instance and triggers
+ * "Only plain objects can be passed to Client Components from Server
+ * Components. Decimal objects are not supported." The `price` and
+ * `compareAtPrice` fields are serialized to strings, which is what the
+ * product form (and the table display) already expect.
+ */
+function serializeProduct(product: Awaited<ReturnType<typeof listProducts>>[number]) {
+  return {
+    id: product.id,
+    name: product.name,
+    slug: product.slug,
+    description: product.description,
+    price: product.price.toString(),
+    compareAtPrice: product.compareAtPrice?.toString() ?? null,
+    sku: product.sku,
+    categoryId: product.categoryId,
+    archived: product.archived,
+    category: { id: product.category.id, name: product.category.name },
+    images: product.images.map((image) => ({ url: image.url })),
+    inventory: product.inventory
+      ? { quantity: product.inventory.quantity }
+      : null,
+    weightGrams: product.weightGrams,
+    lengthCm: product.lengthCm,
+    widthCm: product.widthCm,
+    heightCm: product.heightCm,
+  }
+}
+
 export default async function ProductsPage() {
   // SECURITY: admin authorization happens server-side before any data load.
   await requireAdminOrRedirect()
@@ -22,6 +54,8 @@ export default async function ProductsPage() {
     listProducts(),
     listCategories(),
   ])
+
+  const serializedProducts = products.map(serializeProduct)
 
   return (
     <Container>
@@ -32,7 +66,7 @@ export default async function ProductsPage() {
         <ProductForm categories={categories} />
       </PageHeader>
       <div className="mt-8 rounded-lg border">
-        {products.length === 0 ? (
+        {serializedProducts.length === 0 ? (
           <div className="p-12 text-center text-muted-foreground">
             <p>No products yet. Create your first product to get started.</p>
           </div>
@@ -50,7 +84,7 @@ export default async function ProductsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {products.map((product) => {
+              {serializedProducts.map((product) => {
                 const stock = product.inventory?.quantity ?? null
                 return (
                   <TableRow key={product.id} className={product.archived ? "opacity-60" : undefined}>
@@ -62,7 +96,7 @@ export default async function ProductsPage() {
                       {product.category.name}
                     </TableCell>
                     <TableCell className="text-right">
-                      R {product.price.toString()}
+                      R {product.price}
                     </TableCell>
                     <TableCell className="text-right text-muted-foreground">
                       {stock === null ? "—" : stock}
