@@ -665,3 +665,269 @@ test("a Bob Go quote flows through the registry and produces a valid ZAR quote",
     mock.restore()
   }
 })
+
+// ── Per-product weight/dimensions (Post-MVP #5) ──
+
+test("bobGoParcels uses actual product weight (grams -> kg) when supplied", () => {
+  const parcels = bobGoParcels([{ weightGrams: 750, lengthCm: 10, widthCm: 10, heightCm: 10 }])
+  assert.equal(parcels[0].submitted_weight_kg, 0.75)
+})
+
+test("bobGoParcels uses actual dimensions when supplied", () => {
+  const parcels = bobGoParcels([
+    { weightGrams: 1000, lengthCm: 25, widthCm: 18, heightCm: 6 },
+  ])
+  assert.equal(parcels[0].submitted_length_cm, 25)
+  assert.equal(parcels[0].submitted_width_cm, 18)
+  assert.equal(parcels[0].submitted_height_cm, 6)
+})
+
+test("bobGoParcels applies default dimensions per-field when a dimension is missing", () => {
+  // weight supplied but no dimensions -> weight kept, all dims default.
+  const parcels = bobGoParcels([{ weightGrams: 500 }])
+  assert.equal(parcels[0].submitted_weight_kg, 0.5)
+  assert.equal(parcels[0].submitted_length_cm, DEFAULT_PARCEL_LENGTH_CM)
+  assert.equal(parcels[0].submitted_width_cm, DEFAULT_PARCEL_WIDTH_CM)
+  assert.equal(parcels[0].submitted_height_cm, DEFAULT_PARCEL_HEIGHT_CM)
+})
+
+test("bobGoParcels applies default dimensions per-field for partial dimensions", () => {
+  // length supplied, width/height missing -> length kept, width/height default.
+  const parcels = bobGoParcels([{ weightGrams: 500, lengthCm: 40 }])
+  assert.equal(parcels[0].submitted_length_cm, 40)
+  assert.equal(parcels[0].submitted_width_cm, DEFAULT_PARCEL_WIDTH_CM)
+  assert.equal(parcels[0].submitted_height_cm, DEFAULT_PARCEL_HEIGHT_CM)
+})
+
+test("quote() sends actual product weight and dimensions in the /rates body", async () => {
+  const provider = new BobGoProvider(CONFIG)
+  const mock = mockFetch({ rates: [{ total_price: 60, currency: "ZAR", service_name: "X" }] })
+  try {
+    const req = buildQuoteRequest({
+      origin: {
+        street1: "1 Depot Rd",
+        city: "Cape Town",
+        province: "Western Cape",
+        postalCode: "8001",
+        country: "South Africa",
+      },
+      destination: {
+        street1: "5 Home St",
+        city: "Sandton",
+        province: "Gauteng",
+        postalCode: "2031",
+        country: "South Africa",
+      },
+      subtotal: 100,
+      currency: "ZAR",
+      itemCount: 1,
+      lines: [{ quantity: 1, weightGrams: 1200, lengthCm: 35, widthCm: 22, heightCm: 12 }],
+    })
+    await provider.quote(req)
+    const body = JSON.parse(String(mock.calls[0].init!.body))
+    assert.equal(body.parcels.length, 1)
+    assert.equal(body.parcels[0].submitted_weight_kg, 1.2)
+    assert.equal(body.parcels[0].submitted_length_cm, 35)
+    assert.equal(body.parcels[0].submitted_width_cm, 22)
+    assert.equal(body.parcels[0].submitted_height_cm, 12)
+  } finally {
+    mock.restore()
+  }
+})
+
+test("quote() emits one parcel per unit for quantity > 1 (no dimension multiplication)", async () => {
+  const provider = new BobGoProvider(CONFIG)
+  const mock = mockFetch({ rates: [{ total_price: 80, currency: "ZAR", service_name: "X" }] })
+  try {
+    const req = buildQuoteRequest({
+      origin: {
+        street1: "1 Depot Rd",
+        city: "Cape Town",
+        province: "Western Cape",
+        postalCode: "8001",
+        country: "South Africa",
+      },
+      destination: {
+        street1: "5 Home St",
+        city: "Sandton",
+        province: "Gauteng",
+        postalCode: "2031",
+        country: "South Africa",
+      },
+      subtotal: 300,
+      currency: "ZAR",
+      itemCount: 3,
+      lines: [{ quantity: 3, weightGrams: 900, lengthCm: 20, widthCm: 15, heightCm: 7 }],
+    })
+    await provider.quote(req)
+    const body = JSON.parse(String(mock.calls[0].init!.body))
+    assert.equal(body.parcels.length, 3)
+    for (const p of body.parcels) {
+      assert.equal(p.submitted_weight_kg, 0.9)
+      assert.equal(p.submitted_length_cm, 20)
+      assert.equal(p.submitted_width_cm, 15)
+      assert.equal(p.submitted_height_cm, 7)
+    }
+  } finally {
+    mock.restore()
+  }
+})
+
+test("quote() uses fallback dimensions/weight for a product without physical data", async () => {
+  const provider = new BobGoProvider(CONFIG)
+  const mock = mockFetch({ rates: [{ total_price: 50, currency: "ZAR", service_name: "X" }] })
+  try {
+    const req = buildQuoteRequest({
+      origin: {
+        street1: "1 Depot Rd",
+        city: "Cape Town",
+        province: "Western Cape",
+        postalCode: "8001",
+        country: "South Africa",
+      },
+      destination: {
+        street1: "5 Home St",
+        city: "Sandton",
+        province: "Gauteng",
+        postalCode: "2031",
+        country: "South Africa",
+      },
+      subtotal: 100,
+      currency: "ZAR",
+      itemCount: 1,
+      lines: [{ quantity: 1, weightGrams: null, lengthCm: null, widthCm: null, heightCm: null }],
+    })
+    await provider.quote(req)
+    const body = JSON.parse(String(mock.calls[0].init!.body))
+    assert.equal(body.parcels.length, 1)
+    // weight falls back to DEFAULT_PARCEL_WEIGHT_GRAMS (1000g -> 1kg) in parcelsFromLines.
+    assert.equal(body.parcels[0].submitted_weight_kg, 1)
+    // dimensions fall back to DEFAULT_PARCEL_*_CM in bobGoParcels.
+    assert.equal(body.parcels[0].submitted_length_cm, DEFAULT_PARCEL_LENGTH_CM)
+    assert.equal(body.parcels[0].submitted_width_cm, DEFAULT_PARCEL_WIDTH_CM)
+    assert.equal(body.parcels[0].submitted_height_cm, DEFAULT_PARCEL_HEIGHT_CM)
+  } finally {
+    mock.restore()
+  }
+})
+
+test("quote() treats a zero weight/dimension as missing (fallback)", async () => {
+  const provider = new BobGoProvider(CONFIG)
+  const mock = mockFetch({ rates: [{ total_price: 50, currency: "ZAR", service_name: "X" }] })
+  try {
+    const req = buildQuoteRequest({
+      origin: {
+        street1: "1 Depot Rd",
+        city: "Cape Town",
+        province: "Western Cape",
+        postalCode: "8001",
+        country: "South Africa",
+      },
+      destination: {
+        street1: "5 Home St",
+        city: "Sandton",
+        province: "Gauteng",
+        postalCode: "2031",
+        country: "South Africa",
+      },
+      subtotal: 100,
+      currency: "ZAR",
+      itemCount: 1,
+      lines: [{ quantity: 1, weightGrams: 0, lengthCm: 0, widthCm: 0, heightCm: 0 }],
+    })
+    await provider.quote(req)
+    const body = JSON.parse(String(mock.calls[0].init!.body))
+    assert.equal(body.parcels[0].submitted_weight_kg, 1)
+    assert.equal(body.parcels[0].submitted_length_cm, DEFAULT_PARCEL_LENGTH_CM)
+  } finally {
+    mock.restore()
+  }
+})
+
+test("quote() combines multiple product lines into one parcels array", async () => {
+  const provider = new BobGoProvider(CONFIG)
+  const mock = mockFetch({ rates: [{ total_price: 70, currency: "ZAR", service_name: "X" }] })
+  try {
+    const req = buildQuoteRequest({
+      origin: {
+        street1: "1 Depot Rd",
+        city: "Cape Town",
+        province: "Western Cape",
+        postalCode: "8001",
+        country: "South Africa",
+      },
+      destination: {
+        street1: "5 Home St",
+        city: "Sandton",
+        province: "Gauteng",
+        postalCode: "2031",
+        country: "South Africa",
+      },
+      subtotal: 250,
+      currency: "ZAR",
+      itemCount: 3,
+      lines: [
+        { quantity: 2, weightGrams: 1000, lengthCm: 30, widthCm: 20, heightCm: 10 },
+        { quantity: 1, weightGrams: 200, lengthCm: 8, widthCm: 8, heightCm: 4 },
+      ],
+    })
+    await provider.quote(req)
+    const body = JSON.parse(String(mock.calls[0].init!.body))
+    assert.equal(body.parcels.length, 3)
+    assert.equal(body.parcels[0].submitted_weight_kg, 1)
+    assert.equal(body.parcels[0].submitted_length_cm, 30)
+    assert.equal(body.parcels[2].submitted_weight_kg, 0.2)
+    assert.equal(body.parcels[2].submitted_length_cm, 8)
+  } finally {
+    mock.restore()
+  }
+})
+
+test("response parsing and quote normalization remain unchanged with dimensions", async () => {
+  // Existing response parsing is dimension-agnostic; verify a multi-shape
+  // response still normalizes correctly when parcels carry real dimensions.
+  const provider = new BobGoProvider(CONFIG)
+  const mock = mockFetch({
+    provider_rate_requests: [
+      {
+        status: "success",
+        provider_name: "The Courier Guy",
+        responses: [
+          { total_price: 65, currency: "ZAR", service_level: { name: "Overnight" } },
+          { total_price: 45, currency: "ZAR", service_level: { name: "Economy" } },
+        ],
+      },
+    ],
+  })
+  try {
+    const req = buildQuoteRequest({
+      origin: {
+        street1: "1 Depot Rd",
+        city: "Cape Town",
+        province: "Western Cape",
+        postalCode: "8001",
+        country: "South Africa",
+      },
+      destination: {
+        street1: "5 Home St",
+        city: "Sandton",
+        province: "Gauteng",
+        postalCode: "2031",
+        country: "South Africa",
+      },
+      subtotal: 200,
+      currency: "ZAR",
+      itemCount: 2,
+      lines: [{ quantity: 2, weightGrams: 1500, lengthCm: 40, widthCm: 30, heightCm: 15 }],
+    })
+    const quotes = await provider.quote(req)
+    assert.equal(quotes.length, 2)
+    assert.equal(quotes[0].provider, "bobgo")
+    assert.equal(quotes[0].currency, "ZAR")
+    assert.equal(quotes[0].estimateDays, null)
+    const rates = quotes.map((q) => q.rate).sort((a, b) => a - b)
+    assert.deepEqual(rates, [45, 65])
+  } finally {
+    mock.restore()
+  }
+})

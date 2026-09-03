@@ -60,6 +60,13 @@ export async function getShippingQuoteAction(
         subtotal: lines.subtotal,
         currency,
         itemCount: lines.itemCount,
+        lines: lines.items.map((item) => ({
+          quantity: item.quantity,
+          weightGrams: item.weightGrams,
+          lengthCm: item.lengthCm,
+          widthCm: item.widthCm,
+          heightCm: item.heightCm,
+        })),
       })
     )
     return {

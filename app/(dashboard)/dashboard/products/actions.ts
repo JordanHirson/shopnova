@@ -21,6 +21,36 @@ function errorMessage(err: unknown): string {
   return err instanceof Error ? err.message : "Something went wrong."
 }
 
+/**
+ * Parses an optional non-negative-integer form field (string) into `number |
+ * null`. An empty/missing value becomes null so the column is cleared. The
+ * Zod schema already rejects negative/non-integer input before this runs.
+ */
+function parseOptionalInt(value: FormDataEntryValue | null): number | null {
+  if (typeof value !== "string" || value.trim() === "") return null
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? Math.trunc(n) : null
+}
+
+/** Collects the product form's shared field values from FormData. */
+function productFormValues(formData: FormData) {
+  return {
+    name: formData.get("name"),
+    slug: formData.get("slug"),
+    description: formData.get("description") || null,
+    price: formData.get("price"),
+    compareAtPrice: formData.get("compareAtPrice") || null,
+    sku: formData.get("sku") || null,
+    categoryId: formData.get("categoryId"),
+    imageUrl: formData.get("imageUrl") || null,
+    stock: formData.get("stock") || null,
+    weightGrams: formData.get("weightGrams") || null,
+    lengthCm: formData.get("lengthCm") || null,
+    widthCm: formData.get("widthCm") || null,
+    heightCm: formData.get("heightCm") || null,
+  }
+}
+
 export async function createProductAction(
   _prevState: ProductActionState,
   formData: FormData
@@ -33,17 +63,7 @@ export async function createProductAction(
     return { error: errorMessage(err) }
   }
 
-  const parsed = productSchema.safeParse({
-    name: formData.get("name"),
-    slug: formData.get("slug"),
-    description: formData.get("description") || null,
-    price: formData.get("price"),
-    compareAtPrice: formData.get("compareAtPrice") || null,
-    sku: formData.get("sku") || null,
-    categoryId: formData.get("categoryId"),
-    imageUrl: formData.get("imageUrl") || null,
-    stock: formData.get("stock") || null,
-  })
+  const parsed = productSchema.safeParse(productFormValues(formData))
 
   if (!parsed.success) {
     return {
@@ -56,6 +76,10 @@ export async function createProductAction(
       ...parsed.data,
       imageUrl: parsed.data.imageUrl || null,
       stock: parsed.data.stock ? Number(parsed.data.stock) : null,
+      weightGrams: parseOptionalInt(formData.get("weightGrams")),
+      lengthCm: parseOptionalInt(formData.get("lengthCm")),
+      widthCm: parseOptionalInt(formData.get("widthCm")),
+      heightCm: parseOptionalInt(formData.get("heightCm")),
     })
     revalidatePath("/dashboard/products")
     revalidatePath("/products")
@@ -82,17 +106,7 @@ export async function updateProductAction(
     return { error: "Product id is required." }
   }
 
-  const parsed = productSchema.safeParse({
-    name: formData.get("name"),
-    slug: formData.get("slug"),
-    description: formData.get("description") || null,
-    price: formData.get("price"),
-    compareAtPrice: formData.get("compareAtPrice") || null,
-    sku: formData.get("sku") || null,
-    categoryId: formData.get("categoryId"),
-    imageUrl: formData.get("imageUrl") || null,
-    stock: formData.get("stock") || null,
-  })
+  const parsed = productSchema.safeParse(productFormValues(formData))
 
   if (!parsed.success) {
     return {
@@ -105,6 +119,10 @@ export async function updateProductAction(
       ...parsed.data,
       imageUrl: parsed.data.imageUrl || null,
       stock: parsed.data.stock ? Number(parsed.data.stock) : null,
+      weightGrams: parseOptionalInt(formData.get("weightGrams")),
+      lengthCm: parseOptionalInt(formData.get("lengthCm")),
+      widthCm: parseOptionalInt(formData.get("widthCm")),
+      heightCm: parseOptionalInt(formData.get("heightCm")),
     })
     revalidatePath("/dashboard/products")
     revalidatePath("/products")

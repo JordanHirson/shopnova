@@ -36,6 +36,7 @@ import {
   isShippingDestinationComplete,
   quoteToSnapshot,
   shippingAddressFromDestination,
+  type CheckoutLinePhysical,
   snapshotToRate,
 } from "@/features/shipping/shipping-logic"
 
@@ -102,18 +103,28 @@ export async function createCheckoutIntent(
 
   let subtotal = 0
   let itemCount = 0
+  const physicalLines: CheckoutLinePhysical[] = []
   for (const line of input.items) {
     const product = productById.get(line.productId)
     if (!product) throw new Error("A product in your cart is no longer available.")
     subtotal += Math.round(Number(product.price) * 100 * line.quantity) / 100
     itemCount += line.quantity
+    physicalLines.push({
+      quantity: line.quantity,
+      weightGrams: product.weightGrams,
+      lengthCm: product.lengthCm,
+      widthCm: product.widthCm,
+      heightCm: product.heightCm,
+    })
   }
 
   // Authoritative shipping quote: obtained server-side through the
   // shipping-provider abstraction from the validated destination. The
   // client never supplies a shipping rate — only the destination (address),
   // which is mapped into the common internal request here. Provider-specific
-  // mapping happens inside each courier adapter.
+  // mapping happens inside each courier adapter. Parcels are built from the
+  // re-read products' physical characteristics (one parcel per unit, with
+  // per-field fallback for products without dimensions/weight).
   const currency = "ZAR"
   if (!isShippingDestinationComplete(input.details)) {
     throw new Error("A complete shipping address is required to get a quote.")
@@ -125,6 +136,7 @@ export async function createCheckoutIntent(
     subtotal,
     currency,
     itemCount,
+    lines: physicalLines,
   })
   const quote = await getAuthoritativeShippingQuote(quoteRequest)
 

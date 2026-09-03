@@ -36,18 +36,20 @@
  *   (`service_level.name` / `service_name` / `service_level_code`).
  *
  * LIMITATION — per-product weight/dimensions:
- * The current MVP product schema does NOT carry per-variant weight or
- * dimensions, so an accurate live quote cannot be produced yet. The existing
- * shipping abstraction already supplies a conservative default weight
- * (`DEFAULT_PARCEL_WEIGHT_GRAMS = 1000` → 1 kg) per parcel. Because Bob Go
- * requires parcel dimensions (length/width/height in cm, each >= 1) to compute
- * a rate, this adapter applies a clearly-documented conservative default
- * parcel size (`DEFAULT_PARCEL_*_CM`) when a parcel does not carry dimensions.
- * The resulting quote is therefore an APPROXIMATION based on default package
- * assumptions, NOT a verified accurate charge for the actual goods. This
- * limitation is surfaced in the quote `method` label and documented in
- * PROJECT.md / README.md. Accurate quotes require the post-MVP per-product
- * weight/dimensions schema addition.
+ * Since Post-MVP #5, the product schema carries nullable per-product weight
+ * (grams) and dimensions (cm). The shipping abstraction now builds one parcel
+ * per purchased unit carrying the product's actual weight/dimensions when
+ * present (see `parcelsFromLines` in shipping-logic.ts). This adapter maps
+ * each parcel's supplied values directly into the Bob Go request
+ * (`submitted_weight_kg`, `submitted_length_cm`, ...). When a product has no
+ * physical metadata (or a zero/null value), the shipping layer omits that
+ * field and this adapter falls back to the documented conservative defaults:
+ * `DEFAULT_PARCEL_WEIGHT_GRAMS` (1 kg) is applied by `parcelsFromLines`, and
+ * `DEFAULT_PARCEL_*_CM` (30x20x10 cm) is applied here per-field when a parcel
+ * does not carry a dimension (Bob Go requires dimensions >= 1 cm). Existing
+ * products without dimensions therefore continue to receive the same
+ * approximation-based quotes as before; products WITH dimensions now produce
+ * accurate quotes. The fallback is deterministic and documented.
  *
  * SECURITY:
  * - The API key is server-side only (`import "server-only"`); it never reaches

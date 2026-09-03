@@ -86,12 +86,85 @@ export function parcelsFromItemCount(itemCount: number): Parcel[] {
   }))
 }
 
+/**
+ * Physical characteristics of a single checkout line, used to build accurate
+ * shipping parcels. All fields are optional; missing/zero values fall back to
+ * the documented conservative defaults (see `parcelsFromLines`).
+ */
+export interface CheckoutLinePhysical {
+  quantity: number
+  weightGrams?: number | null
+  lengthCm?: number | null
+  widthCm?: number | null
+  heightCm?: number | null
+}
+
+/**
+ * Returns true when a physical value is "specified": a finite number strictly
+ * greater than zero. Null, undefined, zero, and non-finite values are treated
+ * as "not specified" so the shipping layer falls back to defaults. Zero is
+ * deliberately treated as missing because a zero physical measurement is not
+ * a meaningful shipping input (Bob Go requires dimensions >= 1 cm and a
+ * positive weight).
+ */
+function isSpecified(value: number | null | undefined): value is number {
+  return typeof value === "number" && Number.isFinite(value) && value > 0
+}
+
+/**
+ * Builds the parcel list for a shipping quote from the cart's checkout lines.
+ *
+ * QUANTITY HANDLING:
+ * Each purchased unit is represented as ONE parcel carrying that product's
+ * own physical measurements. Purchasing quantity 3 of a product therefore
+ * produces 3 parcels — each with the product's weight and dimensions — NOT a
+ * single parcel with multiplied dimensions (multiplying dimensions would be
+ * physically incorrect). This matches the existing `parcelsFromItemCount`
+ * convention (one parcel per item) and the Bob Go `parcels` array contract.
+ *
+ * FALLBACK BEHAVIOR (deterministic, backward compatible):
+ * - Weight: when a product has no positive `weightGrams`, the parcel uses the
+ *   documented `DEFAULT_PARCEL_WEIGHT_GRAMS` (1 kg).
+ * - Dimensions: when a product has no positive dimension, the parcel omits it
+ *   (`undefined`), so each courier adapter applies its own documented default
+ *   (Bob Go uses `DEFAULT_PARCEL_*_CM` — see couriers/bobgo.ts).
+ * - A product with partial data (e.g. weight but no dimensions) keeps the
+ *   supplied field and falls back per-field for the missing ones.
+ * - Products with NO physical metadata produce parcels identical to the
+ *   pre-existing `parcelsFromItemCount` behaviour, so existing products
+ *   continue to receive quotes exactly as before.
+ */
+export function parcelsFromLines(lines: CheckoutLinePhysical[]): Parcel[] {
+  const parcels: Parcel[] = []
+  for (const line of lines) {
+    const quantity = Math.max(1, Math.floor(line.quantity))
+    for (let i = 0; i < quantity; i++) {
+      parcels.push({
+        weightGrams: isSpecified(line.weightGrams)
+          ? line.weightGrams
+          : DEFAULT_PARCEL_WEIGHT_GRAMS,
+        lengthCm: isSpecified(line.lengthCm) ? line.lengthCm : undefined,
+        widthCm: isSpecified(line.widthCm) ? line.widthCm : undefined,
+        heightCm: isSpecified(line.heightCm) ? line.heightCm : undefined,
+      })
+    }
+  }
+  // Guarantee at least one parcel so a quote request is always well-formed.
+  return parcels.length > 0 ? parcels : parcelsFromItemCount(1)
+}
+
 // ── Quote request building ────────────────────
 
 /**
  * Assembles a `ShippingQuoteRequest` from the common inputs available at
  * checkout. The origin is the store's dispatch address; the destination is
  * the shopper's shipping address; parcels are derived from the cart.
+ *
+ * When `lines` (per-line physical data) is supplied, parcels are built from
+ * the actual product weight/dimensions via `parcelsFromLines` (one parcel per
+ * unit, with per-field fallback for missing data). When `lines` is omitted,
+ * the legacy `parcelsFromItemCount(itemCount)` behaviour is used so existing
+ * callers and tests remain unchanged.
  */
 export function buildQuoteRequest(input: {
   origin: ShippingAddress
@@ -99,11 +172,15 @@ export function buildQuoteRequest(input: {
   subtotal: number
   currency?: string
   itemCount: number
+  /** Optional per-line physical data for accurate parcel building. */
+  lines?: CheckoutLinePhysical[]
 }): ShippingQuoteRequest {
   return {
     origin: input.origin,
     destination: input.destination,
-    parcels: parcelsFromItemCount(input.itemCount),
+    parcels: input.lines
+      ? parcelsFromLines(input.lines)
+      : parcelsFromItemCount(input.itemCount),
     subtotal: input.subtotal,
     currency: input.currency ?? DEFAULT_SHIPPING_CURRENCY,
   }

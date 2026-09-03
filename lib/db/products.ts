@@ -16,6 +16,10 @@ export interface ProductInput {
   categoryId: string
   imageUrl?: string | null
   stock?: number | null
+  weightGrams?: number | null
+  lengthCm?: number | null
+  widthCm?: number | null
+  heightCm?: number | null
 }
 
 export interface ProductUpdateInput {
@@ -28,6 +32,10 @@ export interface ProductUpdateInput {
   categoryId: string
   imageUrl?: string | null
   stock?: number | null
+  weightGrams?: number | null
+  lengthCm?: number | null
+  widthCm?: number | null
+  heightCm?: number | null
 }
 
 /**
@@ -226,6 +234,10 @@ export async function createProduct(input: ProductInput) {
       sku: input.sku ?? null,
       categoryId: input.categoryId,
       storeId,
+      weightGrams: input.weightGrams ?? null,
+      lengthCm: input.lengthCm ?? null,
+      widthCm: input.widthCm ?? null,
+      heightCm: input.heightCm ?? null,
       images: imageUrl
         ? { create: [{ url: imageUrl, sortOrder: 0 }] }
         : undefined,
@@ -277,6 +289,10 @@ export async function updateProduct(id: string, input: ProductUpdateInput) {
       compareAtPrice: input.compareAtPrice ?? null,
       sku: input.sku ?? null,
       categoryId: input.categoryId,
+      weightGrams: input.weightGrams ?? null,
+      lengthCm: input.lengthCm ?? null,
+      widthCm: input.widthCm ?? null,
+      heightCm: input.heightCm ?? null,
       images: imageUrl
         ? { create: [{ url: imageUrl, sortOrder: 0 }] }
         : undefined,

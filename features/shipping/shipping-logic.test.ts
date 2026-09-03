@@ -13,6 +13,7 @@ import {
   isValidQuote,
   normalizeQuote,
   parcelsFromItemCount,
+  parcelsFromLines,
   quoteToSnapshot,
   selectCheapestQuote,
   shippingAddressFromDestination,
@@ -99,6 +100,96 @@ test("parcelsFromItemCount floors to at least one parcel", () => {
   assert.equal(parcelsFromItemCount(-5).length, 1)
 })
 
+// ── parcelsFromLines (per-product physical data) ──
+
+test("parcelsFromLines emits one parcel per unit (quantity handling)", () => {
+  const parcels = parcelsFromLines([
+    { quantity: 3, weightGrams: 500, lengthCm: 10, widthCm: 10, heightCm: 5 },
+  ])
+  assert.equal(parcels.length, 3)
+  for (const p of parcels) {
+    assert.equal(p.weightGrams, 500)
+    assert.equal(p.lengthCm, 10)
+    assert.equal(p.widthCm, 10)
+    assert.equal(p.heightCm, 5)
+  }
+})
+
+test("parcelsFromLines does NOT multiply dimensions for quantity > 1", () => {
+  // quantity 3 of a 10x10x5 product -> 3 parcels each 10x10x5, not one 30x10x5.
+  const parcels = parcelsFromLines([
+    { quantity: 3, weightGrams: 500, lengthCm: 10, widthCm: 10, heightCm: 5 },
+  ])
+  assert.equal(parcels.length, 3)
+  assert.equal(parcels[0].lengthCm, 10)
+  assert.equal(parcels[1].lengthCm, 10)
+  assert.equal(parcels[2].lengthCm, 10)
+})
+
+test("parcelsFromLines combines multiple lines into one parcel list", () => {
+  const parcels = parcelsFromLines([
+    { quantity: 2, weightGrams: 1000, lengthCm: 30, widthCm: 20, heightCm: 10 },
+    { quantity: 1, weightGrams: 250, lengthCm: 8, widthCm: 8, heightCm: 4 },
+  ])
+  assert.equal(parcels.length, 3)
+  assert.equal(parcels[0].weightGrams, 1000)
+  assert.equal(parcels[1].weightGrams, 1000)
+  assert.equal(parcels[2].weightGrams, 250)
+  assert.equal(parcels[2].lengthCm, 8)
+})
+
+test("parcelsFromLines uses default weight when weightGrams is missing/null/zero", () => {
+  for (const weightGrams of [null, undefined, 0]) {
+    const parcels = parcelsFromLines([{ quantity: 1, weightGrams }])
+    assert.equal(parcels[0].weightGrams, DEFAULT_PARCEL_WEIGHT_GRAMS, `weight ${weightGrams}`)
+  }
+})
+
+test("parcelsFromLines omits dimensions when missing/null/zero (adapter applies its default)", () => {
+  for (const dim of [null, undefined, 0]) {
+    const parcels = parcelsFromLines([
+      { quantity: 1, lengthCm: dim, widthCm: dim, heightCm: dim },
+    ])
+    assert.equal(parcels[0].lengthCm, undefined, `length ${dim}`)
+    assert.equal(parcels[0].widthCm, undefined, `width ${dim}`)
+    assert.equal(parcels[0].heightCm, undefined, `height ${dim}`)
+  }
+})
+
+test("parcelsFromLines applies per-field fallback for partial physical data", () => {
+  // weight but no dimensions -> weight kept, dimensions omitted (per-field).
+  const parcels = parcelsFromLines([
+    { quantity: 1, weightGrams: 750 },
+  ])
+  assert.equal(parcels[0].weightGrams, 750)
+  assert.equal(parcels[0].lengthCm, undefined)
+  assert.equal(parcels[0].widthCm, undefined)
+  assert.equal(parcels[0].heightCm, undefined)
+})
+
+test("parcelsFromLines with no physical data matches parcelsFromItemCount behaviour", () => {
+  const parcels = parcelsFromLines([
+    { quantity: 2, weightGrams: null, lengthCm: null, widthCm: null, heightCm: null },
+  ])
+  const legacy = parcelsFromItemCount(2)
+  assert.equal(parcels.length, legacy.length)
+  for (const p of parcels) {
+    assert.equal(p.weightGrams, DEFAULT_PARCEL_WEIGHT_GRAMS)
+    assert.equal(p.lengthCm, undefined)
+  }
+})
+
+test("parcelsFromLines guarantees at least one parcel for an empty/degenerate input", () => {
+  assert.equal(parcelsFromLines([]).length, 1)
+  assert.equal(parcelsFromLines([{ quantity: 0 }]).length, 1)
+  assert.equal(parcelsFromLines([{ quantity: -3 }]).length, 1)
+})
+
+test("parcelsFromLines floors a fractional quantity", () => {
+  const parcels = parcelsFromLines([{ quantity: 2.9, weightGrams: 100 }])
+  assert.equal(parcels.length, 2)
+})
+
 // ── Quote request building ────────────────────
 
 test("buildQuoteRequest assembles origin, destination, parcels, currency", () => {
@@ -121,6 +212,35 @@ test("buildQuoteRequest honors an explicit currency", () => {
     itemCount: 1,
   })
   assert.equal(req.currency, "USD")
+})
+
+test("buildQuoteRequest uses per-line physical data when lines is supplied", () => {
+  const req = buildQuoteRequest({
+    origin: { street1: "", city: "Cape Town", province: "WC", postalCode: "8001", country: "South Africa" },
+    destination: { street1: "", city: "Joburg", province: "GP", postalCode: "2000", country: "South Africa" },
+    subtotal: 100,
+    itemCount: 3,
+    lines: [{ quantity: 3, weightGrams: 750, lengthCm: 25, widthCm: 15, heightCm: 8 }],
+  })
+  assert.equal(req.parcels.length, 3)
+  assert.equal(req.parcels[0].weightGrams, 750)
+  assert.equal(req.parcels[0].lengthCm, 25)
+  assert.equal(req.parcels[0].widthCm, 15)
+  assert.equal(req.parcels[0].heightCm, 8)
+})
+
+test("buildQuoteRequest falls back to parcelsFromItemCount when lines is omitted", () => {
+  const req = buildQuoteRequest({
+    origin: { street1: "", city: "Cape Town", province: "WC", postalCode: "8001", country: "South Africa" },
+    destination: { street1: "", city: "Joburg", province: "GP", postalCode: "2000", country: "South Africa" },
+    subtotal: 100,
+    itemCount: 2,
+  })
+  assert.equal(req.parcels.length, 2)
+  for (const p of req.parcels) {
+    assert.equal(p.weightGrams, DEFAULT_PARCEL_WEIGHT_GRAMS)
+    assert.equal(p.lengthCm, undefined)
+  }
 })
 
 // ── Quote normalization ───────────────────────

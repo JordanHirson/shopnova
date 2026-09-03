@@ -57,6 +57,10 @@ interface Product {
   category: { id: string; name: string }
   images: { url: string }[]
   inventory: { quantity: number } | null
+  weightGrams: number | null
+  lengthCm: number | null
+  widthCm: number | null
+  heightCm: number | null
 }
 
 interface Category {
@@ -90,6 +94,10 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
       categoryId: product?.categoryId ?? "",
       imageUrl: product?.images?.[0]?.url ?? "",
       stock: product?.inventory ? String(product.inventory.quantity) : "",
+      weightGrams: product?.weightGrams != null ? String(product.weightGrams) : "",
+      lengthCm: product?.lengthCm != null ? String(product.lengthCm) : "",
+      widthCm: product?.widthCm != null ? String(product.widthCm) : "",
+      heightCm: product?.heightCm != null ? String(product.heightCm) : "",
     },
   })
 
@@ -294,6 +302,94 @@ export function ProductForm({ product, categories, onSuccess }: ProductFormProps
                   </FormItem>
                 )}
               />
+              <div className="rounded-md border p-3">
+                <p className="mb-2 text-sm font-medium">
+                  Shipping dimensions
+                </p>
+                <p className="mb-3 text-xs text-muted-foreground">
+                  Optional. Used by live couriers (e.g. Bob Go) for accurate
+                  shipping quotes. Leave blank to use the default parcel
+                  estimate.
+                </p>
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <FormField
+                    control={form.control}
+                    name="weightGrams"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Weight (grams)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="e.g. 750"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="lengthCm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Length (cm)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="e.g. 30"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="widthCm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Width (cm)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="e.g. 20"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                  <FormField
+                    control={form.control}
+                    name="heightCm"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Height (cm)</FormLabel>
+                        <FormControl>
+                          <Input
+                            type="number"
+                            min="0"
+                            placeholder="e.g. 10"
+                            {...field}
+                            value={field.value ?? ""}
+                          />
+                        </FormControl>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                </div>
+              </div>
             </Form>
             {error && <p className="text-sm text-destructive">{error}</p>}
           </div>

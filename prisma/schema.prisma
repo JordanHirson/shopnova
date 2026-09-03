@@ -46,6 +46,15 @@ model Store {
   slug        String     @unique @db.VarChar(255)
   description String?    @db.Text
 
+  // ── Storefront theming (Demo Step 1) ──
+  // `themePreset` stores the selected preset name ("Modern Slate" |
+  // "Warm Artisan" | "Neon Cyber"). `primaryColor` and `accentColor` are
+  // hex strings (e.g. "#334155") applied to the storefront via CSS root
+  // variables. All nullable so existing stores keep the default theme.
+  themePreset  String? @db.VarChar(50)
+  primaryColor String? @db.VarChar(7)
+  accentColor  String? @db.VarChar(7)
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -88,6 +97,18 @@ model Product {
   /** Soft-delete flag. Archived products are hidden from the storefront but
    *  retained so historical OrderItem references stay intact (onDelete: Restrict). */
   archived       Boolean  @default(false)
+
+  // ── Physical characteristics (nullable, post-MVP #5) ──
+  // Used by live courier adapters (e.g. Bob Go) to compute accurate shipping
+  // quotes. All four are nullable so existing products remain valid. The
+  // shipping layer treats null OR zero as "not specified" and falls back to
+  // the documented conservative defaults (see features/shipping/shipping-logic.ts
+  // and features/shipping/couriers/bobgo.ts). Integer grams/centimetres keep
+  // the schema consistent with the existing Int-based inventory fields.
+  weightGrams Int?
+  lengthCm    Int?
+  widthCm     Int?
+  heightCm    Int?
 
   storeId    String   @db.Uuid
   store      Store    @relation(fields: [storeId], references: [id], onDelete: Cascade)

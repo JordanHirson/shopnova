@@ -45,6 +45,37 @@ export const productSchema = z.object({
     .regex(/^\d+$/, "Stock must be a non-negative integer")
     .optional()
     .or(z.literal("")),
+
+  // ── Physical characteristics (optional, post-MVP #5) ──
+  // Non-negative integer strings (grams / centimetres). Negative and
+  // non-integer values are rejected. Zero is accepted by validation but
+  // treated as "not specified" by the shipping layer (which falls back to
+  // the documented conservative defaults). All four accept null/empty/omitted
+  // so existing products without physical metadata remain valid.
+  weightGrams: z
+    .string()
+    .regex(/^\d+$/, "Weight must be a non-negative integer (grams)")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  lengthCm: z
+    .string()
+    .regex(/^\d+$/, "Length must be a non-negative integer (cm)")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  widthCm: z
+    .string()
+    .regex(/^\d+$/, "Width must be a non-negative integer (cm)")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  heightCm: z
+    .string()
+    .regex(/^\d+$/, "Height must be a non-negative integer (cm)")
+    .optional()
+    .nullable()
+    .or(z.literal("")),
 })
 
 export type ProductFormValues = z.infer<typeof productSchema>

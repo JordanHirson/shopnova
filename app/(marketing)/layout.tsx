@@ -7,15 +7,39 @@ import { CartButton } from "@/components/storefront/cart-button"
 import { MobileNav } from "@/components/storefront/mobile-nav"
 import { SearchBox } from "@/components/storefront/search-box"
 import { CartProvider } from "@/features/cart/cart-context"
+import { getDefaultStore } from "@/lib/db/store"
+import { resolveStoreTheme, themeCssText } from "@/lib/theme"
 import { Package } from "lucide-react"
 
-export default function MarketingLayout({
+export const dynamic = "force-dynamic"
+
+export default async function MarketingLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
+  // Inject the store's active theme colors into the storefront CSS root
+  // variables so dashboard changes immediately alter storefront styling.
+  const store = await getDefaultStore()
+  const theme = resolveStoreTheme(
+    store
+      ? {
+          themePreset: store.themePreset,
+          primaryColor: store.primaryColor,
+          accentColor: store.accentColor,
+        }
+      : { themePreset: null, primaryColor: null, accentColor: null }
+  )
+
   return (
     <CartProvider>
+      <style
+        // Set storefront-wide theme variables. Scoped to :root so every
+        // storefront component picks up the active colors.
+        dangerouslySetInnerHTML={{
+          __html: `:root{${themeCssText(theme)}}`,
+        }}
+      />
       <div className="flex min-h-screen flex-col">
         <header className="border-b">
           <Container className="flex min-w-0 h-14 items-center justify-between gap-4">

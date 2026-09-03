@@ -20,6 +20,11 @@ export interface CartProductData {
   price: number
   quantityAvailable: number
   archived: boolean
+  // Physical characteristics (nullable; used by live courier quote building).
+  weightGrams: number | null
+  lengthCm: number | null
+  widthCm: number | null
+  heightCm: number | null
 }
 
 /**
@@ -49,6 +54,10 @@ export async function getCartProduct(productId: string): Promise<CartProductData
     price: Number(product.price),
     quantityAvailable: product.inventory.quantity,
     archived: product.archived,
+    weightGrams: product.weightGrams,
+    lengthCm: product.lengthCm,
+    widthCm: product.widthCm,
+    heightCm: product.heightCm,
   }
 }
 

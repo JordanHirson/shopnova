@@ -25,6 +25,12 @@ export interface AuthoritativeCheckoutLine {
   quantity: number
   unitPrice: number
   lineTotal: number
+  // Physical characteristics (nullable) used to build accurate shipping
+  // parcels for live courier quotes (e.g. Bob Go). Null/zero → fallback.
+  weightGrams: number | null
+  lengthCm: number | null
+  widthCm: number | null
+  heightCm: number | null
 }
 
 /** Authoritative checkout lines + derived subtotal and item count. */
@@ -65,6 +71,10 @@ export async function loadAuthoritativeCheckoutLines(): Promise<AuthoritativeChe
       quantity: line.quantity,
       unitPrice,
       lineTotal,
+      weightGrams: product.weightGrams,
+      lengthCm: product.lengthCm,
+      widthCm: product.widthCm,
+      heightCm: product.heightCm,
     })
   }
 
