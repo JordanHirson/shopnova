@@ -139,7 +139,22 @@ export async function getOrderForAdmin(orderNumber: string) {
     include: {
       items: {
         include: {
-          product: { select: { id: true, name: true, slug: true, archived: true } },
+          // Physical characteristics + inventory are included so the AI
+          // operations triage (Demo Step 5) can verify stock and auto-calculate
+          // weight & dimensions for courier booking without a second query.
+          product: {
+            select: {
+              id: true,
+              name: true,
+              slug: true,
+              archived: true,
+              weightGrams: true,
+              lengthCm: true,
+              widthCm: true,
+              heightCm: true,
+              inventory: { select: { quantity: true } },
+            },
+          },
         },
       },
       customer: {

@@ -14,7 +14,9 @@ import {
 } from "@/components/ui/table"
 import { getOrderForAdmin } from "@/lib/db"
 import { requireAdminOrRedirect } from "@/lib/auth/admin"
+import { triageOrder, type TriageOrder } from "@/features/admin/ai-triage"
 import { cn } from "@/lib/utils"
+import { AiOperationsCopilot } from "../ai-operations-copilot"
 import { OrderStatusForm } from "../order-status-form"
 
 export const dynamic = "force-dynamic"
@@ -52,6 +54,32 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
   const paidStatuses = order.payments.map((p) => p.status)
   const isPaid = paidStatuses.includes("SUCCEEDED")
 
+  // AI Operations Copilot (Demo Step 5): triage runs server-side on every
+  // page load so the analysis is always current. The fulfilment action is
+  // triggered client-side from the copilot card.
+  const triageInput: TriageOrder = {
+    orderNumber: order.orderNumber,
+    currency: order.currency,
+    subtotal: Number(order.subtotal),
+    shippingCity: order.shippingCity,
+    shippingProvince: order.shippingProvince,
+    shippingPostalCode: order.shippingPostalCode,
+    shippingCountry: order.shippingCountry,
+    shippingAddress: order.shippingAddress,
+    isPaid,
+    items: order.items.map((item) => ({
+      quantity: item.quantity,
+      product: {
+        weightGrams: item.product.weightGrams,
+        lengthCm: item.product.lengthCm,
+        widthCm: item.product.widthCm,
+        heightCm: item.product.heightCm,
+        inventory: item.product.inventory,
+      },
+    })),
+  }
+  const triage = await triageOrder(triageInput)
+
   return (
     <Container>
       <Link
@@ -64,6 +92,12 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
         <ArrowLeft className="h-4 w-4" />
         Back to orders
       </Link>
+
+      <AiOperationsCopilot
+        orderNumber={order.orderNumber}
+        triage={triage}
+        className="mb-6"
+      />
 
       <div className="rounded-lg border p-6">
         <div className="flex flex-wrap items-start justify-between gap-4">
