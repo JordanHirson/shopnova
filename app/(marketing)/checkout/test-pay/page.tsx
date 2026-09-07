@@ -3,7 +3,7 @@ import { Container } from "@/components/layout/container"
 import { getIntentById } from "@/lib/db"
 import { TestPayView } from "@/components/storefront/test-pay-view"
 import { getExistingShopperId } from "@/features/cart/session"
-import { isTestPaymentAllowed } from "@/features/payment/payment-logic"
+import { isStorefrontSimulationAllowed } from "@/features/payment/payment-logic"
 
 export const dynamic = "force-dynamic"
 
@@ -21,7 +21,7 @@ export default async function TestPayPage({ searchParams }: TestPayPageProps) {
   const intent = await getIntentById(intentId)
   if (
     !intent ||
-    !isTestPaymentAllowed(
+    !isStorefrontSimulationAllowed(
       process.env.NODE_ENV,
       intent.provider,
       intent.shopperId,
@@ -39,6 +39,7 @@ export default async function TestPayPage({ searchParams }: TestPayPageProps) {
           orderNumber={intent.orderNumber}
           amount={Number(intent.amount)}
           status={intent.status}
+          provider={intent.provider as "test" | "payfast"}
         />
       </Container>
     </div>

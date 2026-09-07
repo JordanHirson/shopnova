@@ -7,6 +7,7 @@ import {
   updateProduct,
   deleteProduct,
   restoreProduct,
+  permanentlyDeleteProduct,
 } from "@/lib/db"
 import { requireAdmin, AdminRequiredError, UnauthenticatedError } from "@/lib/auth/admin"
 
@@ -185,6 +186,35 @@ export async function restoreProductAction(
   } catch (err) {
     return {
       error: err instanceof Error ? err.message : "Failed to restore product.",
+    }
+  }
+}
+
+export async function permanentlyDeleteProductAction(
+  _prevState: ProductActionState,
+  formData: FormData
+): Promise<ProductActionState> {
+  try {
+    await requireAdmin()
+  } catch (err) {
+    return { error: errorMessage(err) }
+  }
+
+  const id = formData.get("id")
+  if (typeof id !== "string" || !id) {
+    return { error: "Product id is required." }
+  }
+
+  try {
+    // Hard-delete the product row entirely. Refuses products that appear on
+    // past orders (OrderItem uses onDelete: Restrict) — archive instead.
+    await permanentlyDeleteProduct(id)
+    revalidatePath("/dashboard/products")
+    revalidatePath("/products")
+    return {}
+  } catch (err) {
+    return {
+      error: err instanceof Error ? err.message : "Failed to delete product.",
     }
   }
 }

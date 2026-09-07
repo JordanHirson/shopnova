@@ -49,7 +49,9 @@ export class PayFastProvider implements PaymentProvider {
       throw new Error("PayFast is not configured on the server.")
     }
 
-    // Build the hosted-form POST fields (no card data).
+    // Build the hosted-form POST fields (no card data). The payload is
+    // always generated so the PayFast form contract is exercised even
+    // when the demo redirects to the local simulation page.
     const fields: Record<string, string> = {
       merchant_id: PAYFAST_MERCHANT_ID!,
       merchant_key: PAYFAST_MERCHANT_KEY!,
@@ -65,9 +67,17 @@ export class PayFastProvider implements PaymentProvider {
     const signature = signPayFast(fields)
     fields.signature = signature
 
+    // In sandbox/test mode, redirect to the local simulation page so the
+    // demo can reliably complete the PayFast ITN flow without depending on
+    // the external sandbox. In production, redirect to the real PayFast
+    // hosted form with the signed payload.
+    const redirectUrl = PAYFAST_TEST_MODE
+      ? `/checkout/test-pay?intentId=${input.metadata.intentId}`
+      : `${PAYFAST_FORM_URL}?${new URLSearchParams(fields).toString()}`
+
     return {
       provider: this.id,
-      redirectUrl: `${PAYFAST_FORM_URL}?${new URLSearchParams(fields).toString()}`,
+      redirectUrl,
       providerReference: `pf-${input.metadata.intentId}`,
     }
   }

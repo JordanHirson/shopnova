@@ -10,7 +10,7 @@ import {
 } from "@/components/ui/table"
 import { listProducts, listCategories } from "@/lib/db"
 import { requireAdminOrRedirect } from "@/lib/auth/admin"
-import { ProductForm, DeleteProductButton, RestoreProductButton } from "./product-form"
+import { ProductForm, DeleteProductButton, RestoreProductButton, PermanentlyDeleteProductButton } from "./product-form"
 
 export const dynamic = "force-dynamic"
 
@@ -83,7 +83,7 @@ export default async function ProductsPage() {
                 <TableHead className="text-right">Price</TableHead>
                 <TableHead className="text-right">Stock</TableHead>
                 <TableHead>Status</TableHead>
-                <TableHead className="w-24 text-right">Actions</TableHead>
+                <TableHead className="w-32 text-right">Actions</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -132,6 +132,7 @@ export default async function ProductsPage() {
                         ) : (
                           <DeleteProductButton product={product} />
                         )}
+                        <PermanentlyDeleteProductButton product={product} />
                       </div>
                     </TableCell>
                   </TableRow>

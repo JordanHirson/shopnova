@@ -170,6 +170,19 @@ export function CheckoutView() {
     })
   }
 
+  // Display-only preview of the payment provider the server will select
+  // for the current shipping destination (PayFast for South Africa,
+  // Stripe for international). The server makes the authoritative
+  // selection inside `startCheckoutPaymentAction` and falls back to the
+  // local Test gateway when the selected real provider is unconfigured.
+  const isSouthAfrica =
+    (country ?? "").trim().toLowerCase() === "south africa"
+  const providerLabel = country
+    ? isSouthAfrica
+      ? "PayFast"
+      : "Stripe"
+    : "our secure payment provider"
+
   if (cartLoading || summaryLoading) {
     return (
       <div className="flex items-center justify-center py-16 text-muted-foreground">
@@ -437,9 +450,8 @@ export function CheckoutView() {
             {isPending ? "Redirecting to payment..." : "Continue to Payment"}
           </Button>
           <p className="text-center text-xs text-muted-foreground">
-            You will be redirected to our secure payment provider
-            (Stripe or PayFast). Card details are never handled by
-            ShopNova.
+            You will be redirected to {providerLabel}. Card details are
+            never handled by ShopNova.
           </p>
           <Link
             href="/cart"

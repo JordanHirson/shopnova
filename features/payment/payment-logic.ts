@@ -96,6 +96,27 @@ export function isTestPaymentAllowed(
   )
 }
 
+/**
+ * Returns true only when a storefront simulation page/action may be used
+ * for the given intent outside production. Covers both the mock Test
+ * gateway and the PayFast sandbox simulation, so the demo can reliably
+ * complete a checkout without depending on a flaky external sandbox.
+ *
+ * The intent must belong to the current shopper, the environment must not
+ * be production, and the provider must be one of the simulation-capable
+ * gateways (`test` or `payfast`).
+ */
+export function isStorefrontSimulationAllowed(
+  nodeEnv: string | undefined,
+  intentProvider: string,
+  intentShopperId: string,
+  currentShopperId: string | null | undefined
+): boolean {
+  if (nodeEnv === "production") return false
+  if (intentShopperId !== currentShopperId) return false
+  return intentProvider === "test" || intentProvider === "payfast"
+}
+
 /** Final amount the provider must charge: authoritative total in cents. */
 export function providerAmountFromTotal(total: number): number {
   return toAmountCents(total)

@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Plus, Pencil, Trash2, RotateCcw, Sparkles, Loader2 } from "lucide-react"
+import { Plus, Pencil, Trash2, RotateCcw, Sparkles, Loader2, XCircle } from "lucide-react"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -41,6 +41,7 @@ import {
   updateProductAction,
   deleteProductAction,
   restoreProductAction,
+  permanentlyDeleteProductAction,
   type ProductActionState,
 } from "./actions"
 
@@ -570,5 +571,63 @@ export function RestoreProductButton({ product }: { product: Product }) {
       </Button>
       {error && <p className="sr-only text-sm text-destructive">{error}</p>}
     </form>
+  )
+}
+
+export function PermanentlyDeleteProductButton({ product }: { product: Product }) {
+  const [open, setOpen] = useState(false)
+  const [error, setError] = useState<string | undefined>()
+  const [isPending, startTransition] = useTransition()
+
+  function handleDelete(formData: FormData) {
+    setError(undefined)
+    startTransition(async () => {
+      const result = await permanentlyDeleteProductAction(
+        {} as ProductActionState,
+        formData
+      )
+      if (result.error) {
+        setError(result.error)
+      } else {
+        setOpen(false)
+      }
+    })
+  }
+
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogTrigger
+        render={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="text-destructive hover:text-destructive"
+            aria-label={`Permanently delete ${product.name}`}
+          >
+            <XCircle />
+          </Button>
+        }
+      />
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Permanently delete product</DialogTitle>
+          <DialogDescription>
+            {`Permanently delete "${product.name}"? This removes it entirely
+            from your database — including images and inventory — and cannot
+            be undone. Products that appear on past orders cannot be
+            permanently deleted; archive them instead.`}
+          </DialogDescription>
+        </DialogHeader>
+        <form action={handleDelete}>
+          <input type="hidden" name="id" value={product.id} />
+          {error && <p className="mb-4 text-sm text-destructive">{error}</p>}
+          <DialogFooter>
+            <Button type="submit" variant="destructive" disabled={isPending}>
+              {isPending ? "Deleting..." : "Delete Permanently"}
+            </Button>
+          </DialogFooter>
+        </form>
+      </DialogContent>
+    </Dialog>
   )
 }

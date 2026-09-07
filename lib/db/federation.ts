@@ -115,12 +115,20 @@ export async function createFederationLink(input: FederationLinkInput) {
 }
 
 /**
- * Deletes a federation link for the default store.
+ * Deletes a federation link for the default store, and removes every product
+ * that was imported from it.
  *
- * Cascade rules from the Prisma schema handle related rows:
+ *   - Products that have never been ordered are hard-deleted. Their images
+ *     and inventory rows cascade away with them (onDelete: Cascade).
+ *   - Products that appear on a historical OrderItem cannot be hard-deleted
+ *     because `OrderItem.product` uses `onDelete: Restrict` (deleting them
+ *     would corrupt order history). Those are archived and unlinked instead
+ *     so they disappear from the storefront/cart while past orders stay
+ *     intact.
  *   - FederationSyncRun rows are cascade-deleted with the link.
- *   - Products keep their rows but have `federationLinkId` set to null
- *     (onDelete: SetNull), so historical orders stay intact.
+ *
+ * Everything runs in a single transaction so the link is only removed when
+ * the product cleanup succeeds.
  */
 export async function deleteFederationLink(id: string) {
   const storeId = await getDefaultStoreId()
@@ -137,7 +145,29 @@ export async function deleteFederationLink(id: string) {
     throw new Error("Federation source not found.")
   }
 
-  await prisma.federationLink.delete({ where: { id } })
+  const products = await prisma.product.findMany({
+    where: { federationLinkId: id },
+    select: { id: true },
+  })
+
+  await prisma.$transaction(async (tx) => {
+    for (const product of products) {
+      const orderedCount = await tx.orderItem.count({
+        where: { productId: product.id },
+      })
+      if (orderedCount > 0) {
+        // Preserve order history: archive + unlink instead of hard-deleting.
+        await tx.product.update({
+          where: { id: product.id },
+          data: { archived: true, federationLinkId: null },
+        })
+      } else {
+        await tx.product.delete({ where: { id: product.id } })
+      }
+    }
+
+    await tx.federationLink.delete({ where: { id } })
+  })
 }
 
 /**
@@ -278,14 +308,14 @@ async function upsertFederatedProduct(args: {
   // 1. Same-link re-sync.
   let existing = await prisma.product.findFirst({
     where: { federationLinkId: linkId, externalId: upstream.externalId },
-    select: { id: true },
+    select: { id: true, images: { orderBy: { sortOrder: "asc" }, take: 1 } },
   })
 
   // 2. Re-link an orphaned product left behind by a removed source.
   if (!existing) {
     existing = await prisma.product.findFirst({
       where: { storeId, externalId: upstream.externalId, federationLinkId: null },
-      select: { id: true },
+      select: { id: true, images: { orderBy: { sortOrder: "asc" }, take: 1 } },
     })
   }
 
@@ -300,6 +330,13 @@ async function upsertFederatedProduct(args: {
         description: upstream.description,
         price: markedPrice,
         sku: upstream.sku,
+        // Keep the primary image in sync with the upstream so image changes
+        // (e.g. a previously-broken URL being fixed) flow through on re-sync.
+        images: upstream.imageUrl
+          ? existing.images[0]
+            ? { update: { where: { id: existing.images[0].id }, data: { url: upstream.imageUrl } } }
+            : { create: [{ url: upstream.imageUrl, sortOrder: 0 }] }
+          : undefined,
         inventory: {
           upsert: {
             create: { quantity: upstream.inventory },

@@ -37,7 +37,9 @@ import {
   type PaymentCompletionResult,
 } from "@/lib/db"
 import { getProvider } from "./provider-registry"
+import { signPayFast } from "./payfast"
 import {
+  isStorefrontSimulationAllowed,
   isTestPaymentAllowed,
   selectProviderForCountry,
   toAmountCents,
@@ -217,4 +219,95 @@ export async function completeTestPaymentAction(
 
   const result = await completePaidIntent(notification, "test")
   return { result }
+}
+
+/** Result of simulating a PayFast ITN success callback. */
+export interface SimulatePayFastResult {
+  ok: boolean
+  orderNumber?: string
+  error?: string
+}
+
+/**
+ * Simulates a verified PayFast ITN (Instant Transaction Notification)
+ * "COMPLETE" callback for demo reliability. Constructs a PayFast form
+ * payload signed with the merchant passphrase and POSTs it to the PayFast
+ * webhook route (`/api/webhooks/payfast`), which verifies the signature
+ * and runs the same `completePaidIntent` completion path as a real ITN —
+ * including idempotency, the authoritative-amount guard, inventory
+ * safety, and cart clearing.
+ *
+ * Only available outside production, and only for a PayFast intent owned
+ * by the current shopper. The browser alone can never call this for a
+ * real provider in production.
+ */
+export async function simulatePayFastSuccessAction(
+  intentId: string
+): Promise<SimulatePayFastResult> {
+  const shopperId = await getExistingShopperId()
+  const intent = await getIntentById(intentId)
+  if (
+    !intent ||
+    !shopperId ||
+    !isStorefrontSimulationAllowed(
+      process.env.NODE_ENV,
+      intent.provider,
+      intent.shopperId,
+      shopperId
+    ) ||
+    intent.provider !== "payfast"
+  ) {
+    return { ok: false, error: "This checkout cannot be simulated." }
+  }
+
+  if (intent.status === "COMPLETED") {
+    return { ok: true, orderNumber: intent.orderNumber }
+  }
+
+  // Build the PayFast ITN form payload with a valid MD5 signature so the
+  // webhook's signature verification passes exactly as it would for a
+  // real PayFast ITN delivery.
+  const amount = Number(intent.amount).toFixed(2)
+  const fields: Record<string, string> = {
+    m_payment_id: intent.id,
+    pf_payment_id: `sim-${intent.id}`,
+    payment_status: "COMPLETE",
+    item_name: `ShopNova Order ${intent.orderNumber}`,
+    amount_gross: amount,
+    amount_fee: "0.00",
+    amount_net: amount,
+    currency: intent.currency || "ZAR",
+  }
+  fields.signature = signPayFast(fields)
+
+  const body = new URLSearchParams(fields).toString()
+
+  // POST to the PayFast webhook route so the simulation exercises the
+  // full webhook verification + completion path.
+  const origin = await getRequestOrigin()
+  const webhookUrl = `${origin}/api/webhooks/payfast`
+
+  let res: Response
+  try {
+    res = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body,
+    })
+  } catch {
+    return { ok: false, error: "Failed to reach the PayFast webhook." }
+  }
+
+  if (!res.ok) {
+    let detail = "PayFast simulation failed."
+    try {
+      const payload = (await res.json()) as { result?: string }
+      if (payload.result) detail = `PayFast simulation failed: ${payload.result}`
+    } catch {
+      // Ignore JSON parse errors; keep the generic message.
+    }
+    return { ok: false, error: detail }
+  }
+
+  return { ok: true, orderNumber: intent.orderNumber }
 }

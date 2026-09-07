@@ -76,7 +76,7 @@ const CATALOGS: Record<MockSource, UpstreamProduct[]> = {
       price: 24.5,
       sku: "NIM-BOTL-002",
       imageUrl:
-        "https://images.unsplash.com/photo-1602143407151-7111547de24e?w=600&q=80",
+        "https://images.unsplash.com/photo-1616118132534-381148898bb4?w=600&q=80",
       inventory: 85,
     },
     {
@@ -87,7 +87,7 @@ const CATALOGS: Record<MockSource, UpstreamProduct[]> = {
       price: 18.0,
       sku: "TER-ORG-003",
       imageUrl:
-        "https://images.unsplash.com/photo-1518733057094-95b53143d2b7?w=600&q=80",
+        "https://images.unsplash.com/photo-1751107807635-a2ac6035e8dd?w=600&q=80",
       inventory: 60,
     },
     {
@@ -146,7 +146,7 @@ const CATALOGS: Record<MockSource, UpstreamProduct[]> = {
       price: 8.5,
       sku: "ALI-CHRG-202",
       imageUrl:
-        "https://images.unsplash.com/photo-1591290619762-c2b9a0b8e1f6?w=600&q=80",
+        "https://images.unsplash.com/photo-1591290619618-904f6dd935e3?w=600&q=80",
       inventory: 500,
     },
     {
@@ -194,7 +194,7 @@ const CATALOGS: Record<MockSource, UpstreamProduct[]> = {
       price: 49.99,
       sku: "AMZ-ECHO-501",
       imageUrl:
-        "https://images.unsplash.com/photo-1543512214-318cbb5db691?w=600&q=80",
+        "https://images.unsplash.com/photo-1519558260268-cde7e03a0152?w=600&q=80",
       inventory: 300,
     },
     {
@@ -242,7 +242,7 @@ const CATALOGS: Record<MockSource, UpstreamProduct[]> = {
       price: 399.0,
       sku: "TKL-TST-801",
       imageUrl:
-        "https://images.unsplash.com/photo-1585659722983-3a30ba0f9e9e?w=600&q=80",
+        "https://images.unsplash.com/photo-1618506408870-64d8bec48248?w=600&q=80",
       inventory: 45,
     },
     {
@@ -253,7 +253,7 @@ const CATALOGS: Record<MockSource, UpstreamProduct[]> = {
       price: 349.0,
       sku: "TKL-KTL-802",
       imageUrl:
-        "https://images.unsplash.com/photo-1517048676732-d65bc937f957?w=600&q=80",
+        "https://images.unsplash.com/photo-1594213114663-d94db9b17125?w=600&q=80",
       inventory: 60,
     },
     {
@@ -264,7 +264,7 @@ const CATALOGS: Record<MockSource, UpstreamProduct[]> = {
       price: 199.0,
       sku: "TKL-CMP-803",
       imageUrl:
-        "https://images.unsplash.com/photo-1504280390367-361c6d9f38f5?w=600&q=80",
+        "https://images.unsplash.com/photo-1557756731-a94d1274f2ac?w=600&q=80",
       inventory: 110,
     },
     {
@@ -275,7 +275,7 @@ const CATALOGS: Record<MockSource, UpstreamProduct[]> = {
       price: 159.0,
       sku: "TKL-CDB-804",
       imageUrl:
-        "https://images.unsplash.com/photo-1548907040-4baa4b9f2f79?w=600&q=80",
+        "https://images.unsplash.com/photo-1623660053975-cf75a8be0908?w=600&q=80",
       inventory: 500,
     },
   ],
@@ -301,7 +301,7 @@ const CATALOGS: Record<MockSource, UpstreamProduct[]> = {
       price: 34.0,
       sku: "WOO-CNDL-302",
       imageUrl:
-        "https://images.unsplash.com/photo-1602874801006-7c1c9c9c7c9c?w=600&q=80",
+        "https://images.unsplash.com/photo-1663089889826-0575c6ae19de?w=600&q=80",
       inventory: 80,
     },
     {
@@ -337,7 +337,7 @@ const CATALOGS: Record<MockSource, UpstreamProduct[]> = {
       price: 5.0,
       sku: "CSV-USBC-001",
       imageUrl:
-        "https://images.unsplash.com/photo-1588872657639-5b9c1e9c9c9c?w=600&q=80",
+        "https://images.unsplash.com/photo-1595756630452-736bc8ef3693?w=600&q=80",
       inventory: 1000,
     },
     {
@@ -357,7 +357,7 @@ const CATALOGS: Record<MockSource, UpstreamProduct[]> = {
       price: 7.0,
       sku: "CSV-STND-003",
       imageUrl:
-        "https://images.unsplash.com/photo-1601784551446-7c8b6b6c9c9c?w=600&q=80",
+        "https://images.unsplash.com/photo-1516245556508-7d60d4ff0f39?w=600&q=80",
       inventory: 750,
     },
   ],

@@ -1,9 +1,11 @@
 import { prisma } from "./prisma"
 import { getDefaultStoreId } from "./store"
+import type { Prisma } from "@prisma/client"
 import {
   DEFAULT_SEARCH_LIMIT,
   clampSearchLimit,
   getSearchTerm,
+  type ParsedNaturalLanguageSearch,
 } from "@/features/search/search-logic"
 
 export interface ProductInput {
@@ -207,6 +209,79 @@ export async function searchStorefrontProducts(
 }
 
 /**
+ * Searches the storefront catalog using a parsed natural-language query.
+ *
+ * Mirrors the pure contract in `productMatchesParsedSearch`:
+ *   - `maxPrice` is a hard filter (`price <= maxPrice`),
+ *   - `color` is a hard filter (must appear in name OR description),
+ *   - `keywords` use OR semantics across name / description / sku / category,
+ *   - archived products are never returned,
+ *   - results are ordered by name ascending and clamped to
+ *     `DEFAULT_SEARCH_LIMIT`.
+ *
+ * When the parsed query has no price cap and no colour, it delegates to
+ * `searchStorefrontProducts` so simple keyword searches keep the existing
+ * substring contract.
+ */
+export async function searchStorefrontProductsParsed(
+  parsed: ParsedNaturalLanguageSearch
+) {
+  if (!parsed.raw) return []
+
+  // No structured filters → use the existing substring search.
+  if (parsed.maxPrice === null && parsed.color === null) {
+    return searchStorefrontProducts(parsed.raw)
+  }
+
+  const storeId = await getDefaultStoreId()
+  if (!storeId) return []
+
+  const andClauses: Prisma.ProductWhereInput[] = []
+
+  if (parsed.maxPrice !== null) {
+    // Strict (< cap) uses `lt`; inclusive (<= cap) uses `lte`.
+    andClauses.push(
+      parsed.inclusive
+        ? { price: { lte: parsed.maxPrice } }
+        : { price: { lt: parsed.maxPrice } }
+    )
+  }
+
+  if (parsed.color) {
+    andClauses.push({
+      OR: [
+        { name: { contains: parsed.color, mode: "insensitive" } },
+        { description: { contains: parsed.color, mode: "insensitive" } },
+      ],
+    })
+  }
+
+  // Colour + keywords together form the OR text-match block. The colour
+  // is already a hard filter above, so it is not duplicated here.
+  const terms = parsed.keywords
+  if (terms.length > 0) {
+    andClauses.push({
+      OR: terms.flatMap((term) => [
+        { name: { contains: term, mode: "insensitive" } },
+        { description: { contains: term, mode: "insensitive" } },
+        { sku: { contains: term, mode: "insensitive" } },
+        { category: { name: { contains: term, mode: "insensitive" } } },
+      ]),
+    })
+  }
+
+  return prisma.product.findMany({
+    where: { storeId, archived: false, AND: andClauses },
+    orderBy: { name: "asc" },
+    take: clampSearchLimit(DEFAULT_SEARCH_LIMIT),
+    include: {
+      category: { select: { id: true, name: true, slug: true } },
+      images: { orderBy: { sortOrder: "asc" }, take: 1 },
+    },
+  })
+}
+
+/**
  * Creates a new product for the default store.
  */
 export async function createProduct(input: ProductInput) {
@@ -338,6 +413,43 @@ export async function deleteProduct(id: string) {
     where: { id },
     data: { archived: true },
   })
+}
+
+/**
+ * Permanently deletes a product by id for the default store (hard delete).
+ *
+ * Unlike `deleteProduct` (which archives), this removes the row entirely
+ * along with its images and inventory (both `onDelete: Cascade`).
+ *
+ * `OrderItem.product` uses `onDelete: Restrict`, so a product that has ever
+ * been ordered cannot be hard-deleted — doing so would corrupt historical
+ * order records. In that case this throws a clear error so the caller can
+ * surface it and suggest archiving instead.
+ */
+export async function permanentlyDeleteProduct(id: string) {
+  const storeId = await getDefaultStoreId()
+  if (!storeId) {
+    throw new Error("No store found.")
+  }
+
+  const product = await prisma.product.findFirst({
+    where: { id, storeId },
+    select: { id: true },
+  })
+  if (!product) {
+    throw new Error("Product not found.")
+  }
+
+  const orderedCount = await prisma.orderItem.count({
+    where: { productId: id },
+  })
+  if (orderedCount > 0) {
+    throw new Error(
+      "This product cannot be permanently deleted because it appears on past orders. Archive it instead to keep order history intact."
+    )
+  }
+
+  return prisma.product.delete({ where: { id } })
 }
 
 /**

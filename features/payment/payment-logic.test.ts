@@ -16,6 +16,7 @@ import {
   amountMatches,
   currencyMatches,
   isProviderMatch,
+  isStorefrontSimulationAllowed,
   isTestPaymentAllowed,
   providerAmountFromTotal,
   resolveProvider,
@@ -83,6 +84,44 @@ test("isTestPaymentAllowed rejects a foreign shopper", () => {
 
 test("isTestPaymentAllowed rejects a missing shopper identity", () => {
   assert.equal(isTestPaymentAllowed("development", "test", "anon-1", null), false)
+})
+
+// ── Storefront simulation gate ─────────────────
+
+test("isStorefrontSimulationAllowed accepts test and payfast intents for the owning shopper", () => {
+  assert.equal(
+    isStorefrontSimulationAllowed("development", "test", "anon-1", "anon-1"),
+    true
+  )
+  assert.equal(
+    isStorefrontSimulationAllowed("development", "payfast", "anon-1", "anon-1"),
+    true
+  )
+})
+
+test("isStorefrontSimulationAllowed rejects production", () => {
+  assert.equal(
+    isStorefrontSimulationAllowed("production", "payfast", "anon-1", "anon-1"),
+    false
+  )
+})
+
+test("isStorefrontSimulationAllowed rejects non-simulation providers", () => {
+  assert.equal(
+    isStorefrontSimulationAllowed("development", "stripe", "anon-1", "anon-1"),
+    false
+  )
+  assert.equal(
+    isStorefrontSimulationAllowed("development", "yoco", "anon-1", "anon-1"),
+    false
+  )
+})
+
+test("isStorefrontSimulationAllowed rejects a foreign shopper", () => {
+  assert.equal(
+    isStorefrontSimulationAllowed("development", "payfast", "anon-1", "anon-2"),
+    false
+  )
 })
 
 // ── Provider selection ─────────────────────────

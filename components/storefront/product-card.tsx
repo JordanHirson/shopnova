@@ -1,6 +1,8 @@
 import Link from "next/link"
 import { ImageIcon } from "lucide-react"
 
+import type { SearchHighlight } from "@/features/search/search-logic"
+
 interface ProductCardProps {
   product: {
     id: string
@@ -11,9 +13,11 @@ interface ProductCardProps {
     category: { name: string; slug: string }
     images: { url: string; alt: string | null }[]
   }
+  /** Optional search highlight tags explaining why the product matched. */
+  highlights?: SearchHighlight[]
 }
 
-export function ProductCard({ product }: ProductCardProps) {
+export function ProductCard({ product, highlights }: ProductCardProps) {
   const image = product.images[0]
   const compareAt = product.compareAtPrice
     ? Number(product.compareAtPrice)
@@ -48,6 +52,18 @@ export function ProductCard({ product }: ProductCardProps) {
         <h3 className="font-medium text-foreground line-clamp-1">
           {product.name}
         </h3>
+        {highlights && highlights.length > 0 && (
+          <div className="mt-1 flex flex-wrap gap-1">
+            {highlights.map((highlight, index) => (
+              <span
+                key={`${highlight.field}-${index}`}
+                className="inline-flex items-center rounded-md bg-primary/10 px-1.5 py-0.5 text-[10px] font-medium text-primary"
+              >
+                {highlight.label}
+              </span>
+            ))}
+          </div>
+        )}
         <div className="mt-auto flex items-baseline gap-2 pt-2">
           <p className="text-sm font-semibold text-foreground">
             R {product.price.toString()}

@@ -1,6 +1,7 @@
 import Link from "next/link"
 import { notFound } from "next/navigation"
 import { Container } from "@/components/layout/container"
+import { CartClearOnSuccess } from "@/components/storefront/cart-clear-on-success"
 import { buttonVariants } from "@/components/ui/button"
 import { getOrderByOrderNumber } from "@/lib/db"
 
@@ -30,6 +31,9 @@ export default async function CheckoutSuccessPage({
   return (
     <div className="py-12 sm:py-16">
       <Container>
+        {/* Clear the persisted cart and refresh the client context so the
+            header badge and cart page no longer show purchased items. */}
+        <CartClearOnSuccess />
         <div className="mx-auto max-w-2xl rounded-lg border p-8 text-center">
           <h1 className="text-2xl font-bold tracking-tight text-foreground">
             {isPaid ? "Payment Confirmed" : "Order Placed"}

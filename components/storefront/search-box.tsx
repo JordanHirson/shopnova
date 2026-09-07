@@ -63,7 +63,7 @@ export function SearchBox() {
           value={value}
           onChange={(e) => setValue(e.target.value)}
           onFocus={() => setExpanded(true)}
-          placeholder="Search products..."
+          placeholder="Search “jacket under R800”..."
           aria-label="Search products"
           className={cn(
             "h-9 w-full rounded-lg border border-input bg-transparent pl-8 pr-3 text-sm text-foreground outline-none transition-colors placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-3 focus-visible:ring-ring/50",

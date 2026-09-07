@@ -66,9 +66,10 @@ export function RemoveFederationButton({
         <DialogHeader>
           <DialogTitle>Remove federation source</DialogTitle>
           <DialogDescription>
-            {`Remove "${name}" from your linked sources? Imported products
-            (${productCount}) will be kept but unlinked from this source, so
-            historical orders stay intact. This action cannot be undone.`}
+            {`Remove "${name}" from your linked sources? All ${productCount}
+            imported product(s) will be permanently deleted. Products that
+            appear on past orders will be archived instead so order history
+            stays intact. This action cannot be undone.`}
           </DialogDescription>
         </DialogHeader>
         <form action={handleDelete}>

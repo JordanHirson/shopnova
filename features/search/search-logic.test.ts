@@ -27,10 +27,14 @@ import {
   getSearchTerm,
   isValidSearchQuery,
   normalizeSearchQuery,
+  parseNaturalLanguageQuery,
   parseSearchQuery,
+  productMatchesParsedSearch,
   productMatchesSearch,
   searchProducts,
+  searchProductsWithHighlights,
   type SearchableProduct,
+  type SearchableProductWithPrice,
 } from "./search-logic.ts"
 
 // ── Test fixtures ──────────────────────────────
@@ -43,6 +47,16 @@ function makeProduct(
     sku: null,
     archived: false,
     category: { name: "Electronics" },
+    ...over,
+  }
+}
+
+function makePricedProduct(
+  over: Partial<SearchableProductWithPrice> & { name: string }
+): SearchableProductWithPrice {
+  return {
+    ...makeProduct(over),
+    price: 100,
     ...over,
   }
 }
@@ -78,6 +92,43 @@ const ARCHIVED = makeProduct({
 })
 
 const CATALOG = [HEADPHONES, MUG, SNEAKERS, ARCHIVED]
+
+// Priced catalog for natural-language search tests.
+const RED_JACKET = makePricedProduct({
+  name: "Cozy Red Winter Jacket",
+  description: "A warm, insulated jacket perfect for cold mornings.",
+  sku: "SN-FASH-010",
+  category: { name: "Fashion" },
+  price: 750,
+})
+
+const BLUE_JACKET = makePricedProduct({
+  name: "Blue Denim Jacket",
+  description: "A classic denim jacket with a relaxed fit.",
+  sku: "SN-FASH-011",
+  category: { name: "Fashion" },
+  price: 950,
+})
+
+const RED_MUG = makePricedProduct({
+  name: "Red Ceramic Mug",
+  description: "A bright red mug for your morning coffee.",
+  sku: "SN-HOME-010",
+  category: { name: "Home & Living" },
+  price: 120,
+})
+
+// A product priced at exactly R50 — used to verify strict vs inclusive
+// price-cap boundaries.
+const FIFTY_RAND_ITEM = makePricedProduct({
+  name: "Fifty Rand Item",
+  description: "A product priced at exactly R50.",
+  sku: "SN-TEST-050",
+  category: { name: "Home & Living" },
+  price: 50,
+})
+
+const PRICED_CATALOG = [RED_JACKET, BLUE_JACKET, RED_MUG, FIFTY_RAND_ITEM]
 
 // ── Query normalization + validation ──────────
 
@@ -287,5 +338,226 @@ test("searchProducts handles products with null description/sku/category", () =>
   assert.equal(productMatchesSearch(sparse, "anything-else"), false)
   // A null category must not throw.
   const results = searchProducts([sparse], "Bare")
+  assert.equal(results.length, 1)
+})
+
+// ── Natural-language query parsing ─────────────
+
+test("parseNaturalLanguageQuery returns empty structured result for blank input", () => {
+  assert.deepEqual(parseNaturalLanguageQuery(""), {
+    raw: "",
+    maxPrice: null,
+    inclusive: false,
+    color: null,
+    keywords: [],
+  })
+  assert.deepEqual(parseNaturalLanguageQuery(null), {
+    raw: "",
+    maxPrice: null,
+    inclusive: false,
+    color: null,
+    keywords: [],
+  })
+})
+
+test("parseNaturalLanguageQuery extracts a price cap with 'under R'", () => {
+  const parsed = parseNaturalLanguageQuery("jacket under R800")
+  assert.equal(parsed.maxPrice, 800)
+  assert.equal(parsed.inclusive, false)
+  assert.equal(parsed.color, null)
+  assert.deepEqual(parsed.keywords, ["jacket"])
+})
+
+test("parseNaturalLanguageQuery treats 'under', 'below', 'less than', 'cheaper than' as strict", () => {
+  assert.equal(parseNaturalLanguageQuery("mug under R500").inclusive, false)
+  assert.equal(parseNaturalLanguageQuery("mug below R500").inclusive, false)
+  assert.equal(parseNaturalLanguageQuery("mug beneath R500").inclusive, false)
+  assert.equal(parseNaturalLanguageQuery("mug less than R500").inclusive, false)
+  assert.equal(parseNaturalLanguageQuery("mug cheaper than R500").inclusive, false)
+})
+
+test("parseNaturalLanguageQuery treats 'up to', 'max', 'or less', 'and under' as inclusive", () => {
+  assert.equal(parseNaturalLanguageQuery("mug up to R500").inclusive, true)
+  assert.equal(parseNaturalLanguageQuery("mug max R1000").inclusive, true)
+  assert.equal(parseNaturalLanguageQuery("mug maximum R1000").inclusive, true)
+  assert.equal(parseNaturalLanguageQuery("R500 or less").inclusive, true)
+  assert.equal(parseNaturalLanguageQuery("R500 or lower").inclusive, true)
+  assert.equal(parseNaturalLanguageQuery("R500 and under").inclusive, true)
+})
+
+test("parseNaturalLanguageQuery extracts price caps with varied phrasing", () => {
+  assert.equal(parseNaturalLanguageQuery("mug below r500").maxPrice, 500)
+  assert.equal(parseNaturalLanguageQuery("mug max R1000").maxPrice, 1000)
+  assert.equal(parseNaturalLanguageQuery("mug less than R200").maxPrice, 200)
+  assert.equal(parseNaturalLanguageQuery("mug up to R750").maxPrice, 750)
+  assert.equal(parseNaturalLanguageQuery("R500 or less").maxPrice, 500)
+})
+
+test("parseNaturalLanguageQuery handles decimal price caps", () => {
+  assert.equal(parseNaturalLanguageQuery("under R99.99").maxPrice, 99.99)
+  assert.equal(parseNaturalLanguageQuery("under R99,99").maxPrice, 99.99)
+})
+
+test("parseNaturalLanguageQuery extracts a colour", () => {
+  const parsed = parseNaturalLanguageQuery("red jacket")
+  assert.equal(parsed.color, "red")
+  assert.deepEqual(parsed.keywords, ["jacket"])
+  assert.equal(parsed.maxPrice, null)
+})
+
+test("parseNaturalLanguageQuery extracts colour, price, and keywords together", () => {
+  const parsed = parseNaturalLanguageQuery("cozy red jacket under R800")
+  assert.equal(parsed.maxPrice, 800)
+  assert.equal(parsed.color, "red")
+  assert.deepEqual(parsed.keywords, ["cozy", "jacket"])
+})
+
+test("parseNaturalLanguageQuery does not extract a colour from a partial word", () => {
+  // "tired" contains "red" but as a substring, not a whole word.
+  const parsed = parseNaturalLanguageQuery("tired mug")
+  assert.equal(parsed.color, null)
+  assert.deepEqual(parsed.keywords, ["tired", "mug"])
+})
+
+test("parseNaturalLanguageQuery preserves the raw normalized query", () => {
+  const parsed = parseNaturalLanguageQuery("  cozy   jacket under R800  ")
+  assert.equal(parsed.raw, "cozy jacket under R800")
+})
+
+// ── Parsed-search matching with highlights ─────
+
+test("productMatchesParsedSearch falls back to substring match without price/color", () => {
+  const parsed = parseNaturalLanguageQuery("headphones")
+  const { matches, highlights } = productMatchesParsedSearch(
+    { ...HEADPHONES, price: 100 },
+    parsed
+  )
+  assert.equal(matches, true)
+  assert.equal(highlights.length, 1)
+  assert.ok(highlights[0].label.includes("headphones"))
+})
+
+test("productMatchesParsedSearch applies the price cap as a hard filter", () => {
+  const parsed = parseNaturalLanguageQuery("jacket under R800")
+  assert.equal(
+    productMatchesParsedSearch(RED_JACKET, parsed).matches,
+    true
+  )
+  // Blue jacket is R950 — above the R800 cap.
+  assert.equal(
+    productMatchesParsedSearch(BLUE_JACKET, parsed).matches,
+    false
+  )
+})
+
+test("productMatchesParsedSearch 'under' is strict: a product at exactly the cap does NOT match", () => {
+  const parsed = parseNaturalLanguageQuery("under R50")
+  assert.equal(parsed.inclusive, false)
+  // FIFTY_RAND_ITEM is priced at exactly R50 — must NOT match "under R50".
+  assert.equal(
+    productMatchesParsedSearch(FIFTY_RAND_ITEM, parsed).matches,
+    false
+  )
+  // RED_MUG at R120 is above the cap — must NOT match.
+  assert.equal(productMatchesParsedSearch(RED_MUG, parsed).matches, false)
+})
+
+test("productMatchesParsedSearch 'up to' is inclusive: a product at exactly the cap DOES match", () => {
+  const parsed = parseNaturalLanguageQuery("up to R50")
+  assert.equal(parsed.inclusive, true)
+  // FIFTY_RAND_ITEM is priced at exactly R50 — MUST match "up to R50".
+  assert.equal(
+    productMatchesParsedSearch(FIFTY_RAND_ITEM, parsed).matches,
+    true
+  )
+  // RED_MUG at R120 is above the cap — must NOT match.
+  assert.equal(productMatchesParsedSearch(RED_MUG, parsed).matches, false)
+})
+
+test("productMatchesParsedSearch 'R50 or less' is inclusive at the boundary", () => {
+  const parsed = parseNaturalLanguageQuery("R50 or less")
+  assert.equal(parsed.inclusive, true)
+  assert.equal(
+    productMatchesParsedSearch(FIFTY_RAND_ITEM, parsed).matches,
+    true
+  )
+})
+
+test("productMatchesParsedSearch 'below' is strict at the boundary", () => {
+  const parsed = parseNaturalLanguageQuery("below R50")
+  assert.equal(parsed.inclusive, false)
+  assert.equal(
+    productMatchesParsedSearch(FIFTY_RAND_ITEM, parsed).matches,
+    false
+  )
+})
+
+test("productMatchesParsedSearch adds a price highlight for in-budget products", () => {
+  const parsed = parseNaturalLanguageQuery("jacket under R800")
+  const { highlights } = productMatchesParsedSearch(RED_JACKET, parsed)
+  assert.ok(highlights.some((h) => h.field === "price" && h.label.includes("800")))
+})
+
+test("productMatchesParsedSearch applies colour as a hard filter on name/description", () => {
+  const parsed = parseNaturalLanguageQuery("red mug")
+  assert.equal(productMatchesParsedSearch(RED_MUG, parsed).matches, true)
+  // Blue jacket does not contain "red".
+  assert.equal(productMatchesParsedSearch(BLUE_JACKET, parsed).matches, false)
+})
+
+test("productMatchesParsedSearch adds a colour highlight", () => {
+  const parsed = parseNaturalLanguageQuery("red mug")
+  const { highlights } = productMatchesParsedSearch(RED_MUG, parsed)
+  assert.ok(highlights.some((h) => h.field === "color" && h.label.includes("red")))
+})
+
+test("productMatchesParsedSearch uses OR semantics for keywords", () => {
+  const parsed = parseNaturalLanguageQuery("cozy jacket under R800")
+  // Red jacket matches "jacket" (and is under R800) even though it is not "cozy".
+  const result = productMatchesParsedSearch(RED_JACKET, parsed)
+  assert.equal(result.matches, true)
+  assert.ok(result.highlights.some((h) => h.label.includes("jacket")))
+})
+
+test("productMatchesParsedSearch never matches archived products", () => {
+  const archived = makePricedProduct({
+    name: "Red Archived Jacket",
+    description: "Old stock.",
+    sku: "SN-OLD",
+    category: { name: "Fashion" },
+    price: 100,
+    archived: true,
+  })
+  const parsed = parseNaturalLanguageQuery("jacket under R800")
+  assert.equal(productMatchesParsedSearch(archived, parsed).matches, false)
+})
+
+test("productMatchesParsedSearch matches on price cap alone with no keywords", () => {
+  const parsed = parseNaturalLanguageQuery("under R200")
+  // Red mug is R120 — under R200.
+  assert.equal(productMatchesParsedSearch(RED_MUG, parsed).matches, true)
+  // Red jacket is R750 — above R200.
+  assert.equal(productMatchesParsedSearch(RED_JACKET, parsed).matches, false)
+})
+
+// ── searchProductsWithHighlights ───────────────
+
+test("searchProductsWithHighlights filters, orders, and returns highlight tags", () => {
+  const parsed = parseNaturalLanguageQuery("jacket under R800")
+  const results = searchProductsWithHighlights(PRICED_CATALOG, parsed)
+  // Only the red jacket (R750) matches "jacket" and is under R800.
+  assert.equal(results.length, 1)
+  assert.equal(results[0].product.name, "Cozy Red Winter Jacket")
+  assert.ok(results[0].highlights.length > 0)
+})
+
+test("searchProductsWithHighlights returns empty for a blank parsed query", () => {
+  const parsed = parseNaturalLanguageQuery("")
+  assert.deepEqual(searchProductsWithHighlights(PRICED_CATALOG, parsed), [])
+})
+
+test("searchProductsWithHighlights applies the result limit", () => {
+  const parsed = parseNaturalLanguageQuery("red")
+  const results = searchProductsWithHighlights(PRICED_CATALOG, parsed, 1)
   assert.equal(results.length, 1)
 })
