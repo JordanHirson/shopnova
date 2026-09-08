@@ -4,19 +4,34 @@
 
 ```
 app/              # Next.js App Router pages and API routes
+  (auth)/         # Clerk sign-in / sign-up routes
+  (dashboard)/    # Admin dashboard route group (own sidebar/topbar layout)
+  (marketing)/    # Storefront route group (storefront, cart, checkout, account)
+  api/            # API routes (webhooks, AI endpoints)
 components/       # Shared React components
-  ui/             # shadcn/ui Base UI primitives (button, input, etc.)
-  layout/         # Layout components (topbar, sidebar, container, etc.)
-  storefront/     # Storefront-specific components (product-card, etc.)
-features/         # Feature-specific modules (auth, products, cart, etc.)
-lib/              # Utility functions, clients (prisma)
-lib/db/           # Database helpers and Prisma client
-lib/validations/  # Zod validation schemas
+  ui/             # shadcn/ui Base UI primitives (button, input, dialog, etc.)
+  layout/         # Layout components (topbar, sidebar, container, ask-shopnova)
+  storefront/     # Storefront-specific components (product-card, search-box, etc.)
+  dashboard/      # Dashboard-specific components (active-carts-feed, etc.)
+features/         # Feature-specific modules (cart, checkout, payment, shipping, etc.)
+  admin/          # Admin logic + AI order triage
+  cart/           # Cart store, session, context, actions
+  checkout/       # Checkout logic + actions
+  payment/        # Payment providers (Stripe, PayFast, Yoco, Stitch, Test)
+  shipping/       # Shipping provider abstraction + couriers (Bob Go)
+  account/        # Customer account logic
+  search/         # Storefront search logic
+lib/              # Utility functions, clients, validations
+  auth/           # Admin authorization helpers
+  db/             # Database helpers and Prisma client (orders, products, federation, etc.)
+  federation/     # Mock federation source connectors
+  validations/    # Zod validation schemas
 hooks/            # Custom React hooks
 types/            # TypeScript type definitions
-prisma/           # Prisma schema and seed
+prisma/           # Prisma schema, migrations, and seed scripts
+  migrations/     # Database migrations
 public/           # Static assets
-scripts/          # Utility scripts (e.g. zip-project)
+scripts/          # Utility scripts (set-admin, test loader)
 ```
 
 ## Key Decisions
@@ -191,16 +206,93 @@ The previous milestone implemented Yoco and the Stitch/Svix webhook foundation, 
 - **No schema change** was required or made.
 - **Status:** implemented per the official public API contract and unit-tested against real signature math (mocked `fetch` for `createSession`). NOT exercised against the live Stitch sandbox (no `STITCH_*` credentials in this environment), so it is not marked production-verified. Live-API verification remains pending real credentials.
 
+## Storefront Theming (Demo Step 1)
+
+- **Schema (additive):** `Store.themePreset` (VarChar 50), `Store.primaryColor` (VarChar 7), `Store.accentColor` (VarChar 7) — all nullable so existing stores keep the default theme. Migration: `prisma/migrations/20260903010000_add_store_theme`.
+- **Source of truth:** `lib/theme.ts` centralizes the three selectable presets (`Modern Slate`, `Warm Artisan`, `Neon Cyber`), their default hex colors, `resolveStoreTheme` (falls back to the default preset when any field is missing/invalid), `normalizeHex` (validates `#rrggbb`), `isThemePresetName`, and `themeCssText` (builds the `--primary`/`--accent` CSS declarations).
+- **Application:** the storefront layout reads the default store's theme via `resolveStoreTheme` and injects the resolved colors into `:root` CSS variables so the entire storefront (buttons, accents, links) re-skins instantly. The dashboard is unaffected.
+- **Dashboard customizer:** `/dashboard/settings` (admin-gated via `requireAdminOrRedirect()`) renders the `ThemeCustomizer` (`app/(dashboard)/dashboard/settings/theme-customizer.tsx`) — preset selector buttons + custom color pickers. Saving calls `updateStoreThemeAction` (`app/(dashboard)/dashboard/settings/actions.ts`), which re-validates with `storeThemeSchema` (`lib/validations/store.ts`), normalizes inputs server-side via `updateDefaultStoreTheme` (`lib/db/store.ts`), and `revalidatePath("/", "layout")` so the storefront updates immediately.
+- **Security:** the action authorizes via `requireAdmin()` before any DB write; colors are re-validated and normalized server-side (never trusted from the client).
+
+## AI-Assisted Product Creation (Demo Step 2)
+
+- **Route:** `POST /api/ai/generate-product` (`app/api/ai/generate-product/route.ts`, `runtime = "nodejs"`, `force-dynamic`). Accepts `keywords` and/or `imageUrl`/`imageBase64` and returns a validated `GeneratedProduct` (`title`, `description`, `tags`, `suggestedPrice`, `categorySlug` mapped to one of the store's existing categories).
+- **Provider-agnostic LLM:** when `OPENAI_API_KEY` (or `AI_API_KEY`) is set, the route calls an OpenAI-compatible Chat Completions API with JSON response mode. `AI_BASE_URL` and `AI_MODEL` make any OpenAI-compatible provider work (OpenAI, Google Gemini, Groq, OpenRouter). Vision image input is supported when a base64 image is supplied. No new dependency — uses native `fetch`.
+- **Deterministic mock fallback:** when no key is configured (the default for local demos), a deterministic mock generator (`mockGenerate`) returns realistic, archetype-based product details so the demo always succeeds instantly without credentials or a network call. The mock picks a category slug that exists in the store.
+- **Security:** only admins may invoke the route (`requireAdmin()` — it can call a paid external API and reads the store's category list). Input is validated with Zod; the LLM response is re-validated against `generatedProductSchema` before use. LLM failures fall back to the mock so a flaky/key-limited demo still works.
+- **UI integration:** the admin product form (`app/(dashboard)/dashboard/products/product-form.tsx`) has an "AI Autofill" button that calls the endpoint with the current keywords/image and autofills name, slug, description (with tags folded in), price, and category. The merchant reviews and edits everything before saving.
+
+## Catalog Federation (Demo Step 3, GUIDEBOOK §8)
+
+Links an external store (Shopify/Amazon/Takealot/AliExpress/WooCommerce/CSV) so its products can be imported, marked up, and resold with auto-sync.
+
+- **Schema (additive):** `FederationLink` (source, name, config JSON, lastSyncedAt, errorMessage), `FederationSyncRun` (RUNNING/SUCCESS/FAILED, created/updated/removed counts, errors), and `Product.federationLinkId` + `Product.externalId` (nullable; `onDelete: SetNull` so historical orders stay intact when a link is removed). Migrations: `prisma/migrations/*`.
+- **Data layer (`lib/db/federation.ts`):** `applyMarkup` (percentage `base * (1 + value/100)` or fixed `base + value`, rounded to 2dp), link CRUD (`listFederationLinks`, `getFederationLinkById`, `createFederationLink`, `deleteFederationLink`), `listFederationSyncRuns`, and the sync runner `runFederationSync`. The runner creates a `RUNNING` sync run, pages through upstream products, upserts each as a federated `Product` (matched by `externalId`), updates the run to `SUCCESS` with counts, and on failure marks it `FAILED` and rethrows.
+- **Upsert strategy:** same-link re-sync updates existing products (re-applying markup so upstream price changes flow through); an orphaned product left by a removed source (federationLinkId = null, same externalId) is re-linked instead of duplicated; genuinely new products get a store-unique slug. Inventory and the primary image are kept in sync with the upstream on re-sync.
+- **Link deletion:** runs in a single transaction. Products that have never been ordered are hard-deleted (images/inventory cascade); products on historical `OrderItem`s are archived + unlinked (preserving order history, mirroring the soft-delete policy). `FederationSyncRun` rows cascade-delete with the link.
+- **Mock sources (`lib/federation/mock-sources.ts`):** DEMO-only stand-in for the real per-source connectors. Returns a fixed, realistic, source-specific catalog (Shopify, Amazon, Takealot, AliExpress, WooCommerce, CSV) so the federation demo runs with no external credentials, network, or chance of failure. The `UpstreamProduct` shape mirrors what a real source client would return, so swapping this file for real per-source clients later requires no changes to the runner.
+- **Dashboard (`/dashboard/federation`):** admin-gated. Lists linked sources (source, name, product count, last sync, status pill) with Sync + Remove actions, and a recent sync runs table. The `FederationForm` creates a new link (name, source, target category, markup type/value, sync interval) validated with `federationLinkSchema` (`lib/validations/federation.ts`).
+- **Server actions (`app/(dashboard)/dashboard/federation/actions.ts`):** `createFederationLinkAction`, `runFederationSyncAction`, `deleteFederationLinkAction` — all authorize via `requireAdmin()` before any DB write and `revalidatePath` the federation page, products page, and storefront so new/removed products appear immediately.
+- **Security:** every action/page authorizes via `requireAdmin()`/`requireAdminOrRedirect()`; the target category is verified to belong to the default store before a link is created. Courier/source credentials are server-only.
+
+## AI Order Triage & Fulfilment (Demo Step 5)
+
+- **Pure triage (`features/admin/ai-triage.ts`, server-only):** `triageOrder` runs four analyses on an order:
+  - `assessFraudRisk` — deterministic fraud-risk score (Low/Medium/High, 0–100 safety score) from order characteristics (paid status, subtotal). Conservative heuristic; the schema does not yet persist a risk score.
+  - `verifyStock` — verifies stock across all order lines against persisted inventory (In Stock / Low Stock / Out of Stock); lines without an inventory record are treated as fulfilable.
+  - `calculateWeightAndDimensions` — auto-calculates the shipment's physical characteristics from order lines; weight is summed across units; dimensions fall back to the documented conservative defaults per-field when a product lacks them.
+  - `recommendCourier` — recommends the cheapest courier by querying the live shipping registry (Bob Go when configured) via the existing `getShippingQuotes` + `selectCheapestQuote` defensive boundary. When no live courier is configured, returns the deterministic simulated recommendation (The Courier Guy via Bob Go, R85.00, ~48h) clearly labelled `simulated: true` so Demo Step 5 is reproducible without API keys.
+- **Tracking number:** `generateTrackingNumber` produces a deterministic `BG-ZA-XXXXXX` tracking number derived from a stable hash of the order number, so re-running fulfilment yields the same number for the same order (demo reproducibility + idempotency).
+- **AI Operations Copilot UI (`app/(dashboard)/dashboard/orders/ai-operations-copilot.tsx`):** renders the triage result on the admin order detail page — fraud risk, stock verification, weight & dimensions, and the courier recommendation. An "AI Fulfill & Book Courier" button triggers `aiFulfillOrderAction`.
+- **Fulfilment action (`app/(dashboard)/dashboard/orders/ai-fulfillment-actions.ts`):** `aiFulfillOrderAction` authorizes via `requireAdmin()`, re-loads the order server-side, re-runs the courier recommendation through the live registry (with the deterministic simulated fallback), advances the order to `PROCESSING` (payment state is never touched), generates the tracking number, and returns the label details for the modal. `revalidatePath` refreshes the orders list and detail.
+- **Security:** the triage never trusts client input — it re-loads order data from the persisted record passed in by the caller (which itself was loaded behind `requireAdmin()`). The action authorizes before any DB read or write. Payment state is never touched (mirrors `updateOrderStatusAction`).
+
+## AI Insights / Ask ShopNova (Demo Step 6)
+
+- **Route:** `POST /api/ai/insights` (`app/api/ai/insights/route.ts`, `runtime = "nodejs"`, `force-dynamic`). Answers merchant questions such as "Which collections drove growth this month?" by aggregating `OrderItem` revenue by product category, comparing the current calendar month against the previous one, and returning a natural-language summary plus supporting mini metric bars.
+- **Aggregation:** `aggregateCategoryMetrics` pulls order items with their product's category for both periods in two store-scoped queries, aggregates in JS, and computes month-over-month growth % (null when the previous month had zero revenue). Sorted by this-month revenue descending.
+- **Provider-agnostic LLM:** when `OPENAI_API_KEY` (or `AI_API_KEY`) is set, `composeWithLLM` calls an OpenAI-compatible Chat Completions API to phrase the summary naturally from the aggregated metrics. `AI_BASE_URL` and `AI_MODEL` are configurable. No new dependency (native `fetch`).
+- **Deterministic mock fallback:** `composeMockAnswer` builds a concise natural-language summary from the metrics so the demo always succeeds instantly without credentials. The response is labelled `simulated: true` so the UI can flag it.
+- **Response shape (`InsightsResponse`):** `answer`, `metrics` (per-category revenue + growth %), `currency`, `periodLabel`, `totalRevenue`, `simulated`.
+- **UI (`components/layout/ask-shopnova.tsx`):** a top-bar button in the dashboard topbar opens a right-hand slide-over panel (built on the existing Base UI Dialog primitive — no new dependency) with suggested question chips and a free-text input. Submitting calls `/api/ai/insights` and renders the answer plus supporting mini metric bars (category revenue + month-over-month growth).
+- **Security:** only admins may invoke the route (`requireAdmin()` — it reads store sales data). Input is validated with Zod.
+
+## Abandoned Cart Recovery (Demo Step 7)
+
+- **Feed (`lib/db/abandonment.ts`):** `getAbandonedCarts` derives a deterministic set of abandoned carts from the store's REAL customers and products (the MVP stores active carts in Redis and has no `abandonedAt` column in PostgreSQL, so this avoids a schema migration or new dependency). Each cart has 1–3 items, a friendly cart number (#301+), a customer name/email, a total, and varied inactivity minutes. Sorted by most recently active first. Returns an empty list when the store has no customers or products.
+- **Recovery email:** `buildRecoveryEmail` builds the exact email that would be fired to the customer (personalized subject, abandoned items, 10% discount recovery link) and returns it for the live preview modal. In production this would hand off to Resend/Customer.io; for the MVP demo it returns the rendered preview so the merchant sees precisely what was sent.
+- **Dashboard (`/dashboard`):** the dashboard home page renders an "Active Carts & Recovery" section with the `ActiveCartsFeed` component (`components/dashboard/active-carts-feed.tsx`). Each cart has a "Trigger Recovery Email" button that calls `triggerRecoveryEmailAction` (`app/(dashboard)/dashboard/abandonment-actions.ts`) and shows the rendered email preview in a modal.
+- **Security:** the action authorizes via `requireAdmin()` before any DB read. The cart id is resolved server-side from the store's real customers/products; no client input is trusted for the email contents.
+
+## Demo Order Seeding (`prisma/seed-orders.ts`)
+
+The main seed (`prisma/seed.ts`) creates the store, categories, products, and inventory — but NO customers and NO orders. `seed-orders` fills that gap so the dashboard's "Recent orders" table, the AI insights growth %, and the Active Carts & Recovery feed all have realistic data.
+
+- **Creates:** 6 customers (also used by the abandonment feed) and ~40 orders spread across THIS month and LAST month, weighted so Electronics leads growth (~+42–50%), followed by Fashion — exactly the story the AI insights demo tells.
+- **Idempotent:** safe to run multiple times. It does NOT delete existing orders/customers; it only creates what's missing (upserts customers by `[storeId, email]`, skips orders whose `orderNumber` already exists). Re-running after a month boundary simply adds more orders to the new "this month".
+- **Requires:** `npm run db:seed` must be run first (it needs the store, categories, and products).
+- **Run:** `npm run db:seed-orders`.
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
-| `npm run dev` | Start dev server |
+| `npm install` | Install dependencies |
+| `npm run dev` | Start the dev server (http://localhost:3000) |
 | `npm run build` | Production build |
+| `npm run start` | Start the production server (after `build`) |
 | `npm run lint` | Run ESLint |
-| `npm run db:seed` | Seed demo data |
-| `npm run set-admin -- <clerkUserId> [--remove]` | Grant/revoke the admin role on a Clerk user |
-| `npx prisma db push` | Sync schema to DB |
-| `npx prisma studio` | Open DB browser |
-| `npx prisma validate` | Validate Prisma schema |
-| `npx prisma generate` | Generate Prisma Client |
+| `npm test` | Run the unit test suite (Node native test runner) |
+| `npm run db:seed` | Seed demo store, categories, products, and inventory |
+| `npm run db:seed-orders` | Seed demo customers and orders (run after `db:seed`) |
+| `npm run set-admin -- <clerkUserId>` | Grant the admin role on a Clerk user |
+| `npm run set-admin -- <clerkUserId> --remove` | Revoke the admin role on a Clerk user |
+| `npx prisma db push` | Sync the Prisma schema to the database |
+| `npx prisma db seed` | Run the Prisma seed (equivalent to `npm run db:seed`) |
+| `npx prisma generate` | Generate the Prisma Client |
+| `npx prisma validate` | Validate the Prisma schema |
+| `npx prisma studio` | Open Prisma Studio (database browser) |
+| `npx prisma migrate dev` | Create and apply a new migration (development) |
+| `npx prisma migrate deploy` | Apply pending migrations (production) |
+| `npx tsc --noEmit` | Type-check the project without emitting files |
+| `npx next build` | Production build (equivalent to `npm run build`) |

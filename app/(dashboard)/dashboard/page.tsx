@@ -6,6 +6,7 @@ import {
   ShoppingCart,
   Clock,
   AlertTriangle,
+  Activity,
 } from "lucide-react"
 
 import { PageHeader } from "@/components/layout/page-header"
@@ -19,7 +20,9 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { buttonVariants } from "@/components/ui/button"
+import { ActiveCartsFeed } from "@/components/dashboard/active-carts-feed"
 import { getAdminOverview } from "@/lib/db/admin"
+import { getAbandonedCarts } from "@/lib/db/abandonment"
 import { requireAdminOrRedirect } from "@/lib/auth/admin"
 import { cn } from "@/lib/utils"
 
@@ -53,6 +56,7 @@ export default async function DashboardPage() {
   await requireAdminOrRedirect()
 
   const overview = await getAdminOverview()
+  const abandonedCarts = await getAbandonedCarts()
 
   if (!overview) {
     return (
@@ -196,6 +200,25 @@ export default async function DashboardPage() {
               </TableBody>
             </Table>
           )}
+        </div>
+      </section>
+
+      <section className="mt-10">
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-1.5 text-lg font-semibold tracking-tight text-foreground">
+            <Activity className="h-4 w-4 text-primary" />
+            Active Carts &amp; Recovery
+          </h2>
+          <span className="text-xs text-muted-foreground">
+            Real-time abandonment feed
+          </span>
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Carts left behind by shoppers, ranked by most recent activity.
+          Trigger a recovery email with a 10% discount to win them back.
+        </p>
+        <div className="mt-4">
+          <ActiveCartsFeed carts={abandonedCarts} />
         </div>
       </section>
     </Container>

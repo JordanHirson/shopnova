@@ -37,6 +37,10 @@ ShopNova is a modern e-commerce platform built with Next.js (App Router), TypeSc
 
    - `UPSTASH_REDIS_REST_URL` and `UPSTASH_REDIS_REST_TOKEN` — Upstash Redis for production cart persistence (see [Cart Persistence](#cart-persistence) below). When both are set, carts are stored in Redis with a 30-day TTL. When unset in development, the cart falls back to an in-memory store. **In production these are required** — ShopNova will not silently fall back to an in-memory cart.
    - `TEST_PAYMENT_SECRET` — override for the local mock payment gateway
+   - `BOBGO_API_KEY` + `BOBGO_TEST_MODE` — Bob Go live courier for real shipping quotes (see [Shipping](#shipping))
+   - `YOCO_SECRET_KEY` + `YOCO_WEBHOOK_SECRET` — Yoco hosted Checkout (SA)
+   - `STITCH_CLIENT_ID` + `STITCH_CLIENT_SECRET` + `STITCH_WEBHOOK_SECRET` — Stitch Pay By Bank (SA)
+   - `OPENAI_API_KEY` (or `AI_API_KEY`) + optional `AI_BASE_URL` + `AI_MODEL` — AI product generation and insights (see [AI Features](#ai-features)). When unset, deterministic mock generators run so the demo always succeeds offline.
 
 3. Push the Prisma schema and generate the client:
 
@@ -48,6 +52,12 @@ ShopNova is a modern e-commerce platform built with Next.js (App Router), TypeSc
 
    ```bash
    npm run db:seed
+   ```
+
+   Optionally, seed demo customers and orders (for the dashboard, AI insights, and abandonment feed):
+
+   ```bash
+   npm run db:seed-orders
    ```
 
 5. Start the dev server:
@@ -160,6 +170,11 @@ This requires `CLERK_SECRET_KEY` in your `.env.local`. You can also set it via t
 - **Inventory (`/dashboard/inventory`)** — view stock levels and low-stock thresholds, update quantities and thresholds.
 - **Orders (`/dashboard/orders`, `/dashboard/orders/[orderNumber]`)** — view orders and order details, update fulfillment status. Payment status is read-only and stays webhook-driven — an admin UI action can never mark an order paid or refunded.
 - **Customers (`/dashboard/customers`, `/dashboard/customers/[customerId]`)** — view customers and their order history. No auth identifiers are exposed.
+- **Federation (`/dashboard/federation`)** — link external stores, import their products with markup, and run syncs (see [Catalog Federation](#catalog-federation)).
+- **Settings (`/dashboard/settings`)** — customize the storefront theme and colors (see [Storefront Theming](#storefront-theming)).
+- **AI Operations Copilot** (on the order detail page) — AI order triage and one-click fulfilment + courier booking (see [AI Features](#ai-features)).
+- **Ask ShopNova** (top-bar button) — conversational AI sales insights (see [AI Features](#ai-features)).
+- **Active Carts & Recovery** (on the dashboard home page) — abandoned cart feed with recovery email trigger (see [AI Features](#ai-features)).
 
 ### Security
 
@@ -183,6 +198,42 @@ Shoppers can search the storefront product catalog from a search box in the stor
 ### Advanced search (post-MVP roadmap)
 
 The following are deliberately deferred and not part of the MVP: PostgreSQL full-text search (`tsvector`/`tsquery` + GIN indexes), trigram indexes (`pg_trgm`) for fuzzy/typo-tolerant matching, pgvector semantic/vector search, AI/LLM search, embeddings, personalized search, and catalog federation search. The current `ILIKE` substring implementation is fast and sufficient for the MVP catalog size.
+
+## Storefront Theming
+
+The store owner can customize the storefront's look from the dashboard at `/dashboard/settings` (admin-gated). Changes apply to the storefront immediately after saving.
+
+- **Presets:** three selectable themes — Modern Slate, Warm Artisan, Neon Cyber — each with default primary + accent colors. A custom color picker overrides the preset colors.
+- **Application:** the selected colors are applied to the storefront via `:root` CSS variables (`--primary`, `--accent`) so the entire storefront re-skins instantly. The dashboard is unaffected.
+- **Schema:** `Store.themePreset`, `Store.primaryColor`, `Store.accentColor` (all nullable, additive migration). Existing stores keep the default theme.
+- **Source of truth:** `lib/theme.ts` centralizes the presets and color normalization; the dashboard customizer and storefront layout both import from it.
+
+## Catalog Federation
+
+The admin can link external stores (Shopify, Amazon, Takealot, AliExpress, WooCommerce, CSV) at `/dashboard/federation`, import their products, apply a markup, and resell them with auto-sync.
+
+- **Link:** create a federation source (name, source type, target category, markup rule — percentage or fixed, sync interval). The link stores its config in a JSON column.
+- **Sync:** running a sync pages through the upstream products, applies the markup rule to each price, and upserts them as `Product` rows tied to the link (matched by `externalId`). Re-syncs update existing products so upstream price changes flow through; orphaned products left by a removed source are re-linked instead of duplicated. Each run is recorded as a `FederationSyncRun` (RUNNING → SUCCESS/FAILED with created/updated counts).
+- **Removal:** deleting a link hard-deletes its products that have never been ordered (images/inventory cascade), and archives + unlinks products on historical orders (preserving order history, mirroring the soft-delete policy). Everything runs in a single transaction.
+- **Mock sources:** the MVP uses deterministic mock catalogs (`lib/federation/mock-sources.ts`) for each source type so the demo runs with no external credentials or network. The `UpstreamProduct` shape mirrors a real source client, so swapping the mock for real per-source connectors later requires no changes to the sync runner.
+- **Security:** every page/action authorizes via `requireAdmin()`; the target category is verified to belong to the default store before a link is created.
+
+## AI Features
+
+ShopNova includes AI-powered merchandising and operations features. All AI routes are admin-gated and use a provider-agnostic OpenAI-compatible Chat Completions client (no new dependency — native `fetch`). When no API key is configured, deterministic mock generators run so the demo always succeeds instantly offline.
+
+- **AI Product Generation (`POST /api/ai/generate-product`):** accepts product keywords and/or an image, returns structured JSON (title, description, tags, suggested price, category) that the admin product form autofills. The admin product form has an "AI Autofill" button. Vision image input is supported when a base64 image is supplied.
+- **AI Insights / Ask ShopNova (`POST /api/ai/insights`):** answers merchant questions such as "Which collections drove growth this month?" by aggregating order-item revenue by category and comparing the current month against the previous one. Returns a natural-language summary plus supporting mini metric bars. A top-bar "Ask ShopNova" button in the dashboard opens a slide-over panel with suggested questions and a free-text input.
+- **AI Order Triage & Fulfilment:** the admin order detail page shows an "AI Operations Copilot" card that triages the order (fraud risk, stock verification, auto-calculated weight & dimensions, cheapest-courier recommendation via the existing shipping registry). An "AI Fulfill & Book Courier" button advances the order to PROCESSING and generates a tracking number + shipping label. When no live courier is configured, a deterministic simulated recommendation is returned (clearly labelled).
+- **Abandoned Cart Recovery:** the dashboard home page shows an "Active Carts & Recovery" feed derived deterministically from the store's real customers and products. A "Trigger Recovery Email" button builds the exact recovery email (personalized subject, abandoned items, 10% discount link) and shows a live preview. In production this would hand off to Resend/Customer.io; for the MVP it returns the rendered preview.
+
+### AI environment variables
+
+- `OPENAI_API_KEY` (preferred) or `AI_API_KEY` (generic alias) — the API key. When neither is set, deterministic mock generators run.
+- `AI_BASE_URL` — override the OpenAI-compatible endpoint (e.g. Google Gemini, Groq, OpenRouter).
+- `AI_MODEL` — override the model name.
+
+See `.env.example` for provider-specific examples (OpenAI, Google Gemini, Groq, OpenRouter).
 
 ## Database Setup
 
@@ -218,3 +269,45 @@ npx prisma db seed
 Yes. The seed is **idempotent** — it uses `upsert` operations keyed on unique slugs/SKUs, so running it multiple times will not create duplicate stores, categories, products, or inventory records. It never deletes or modifies existing application data.
 
 > **Note:** This seed is intended for **development/demo purposes only**. It is not a production data migration.
+
+## Seeding Demo Orders
+
+The main seed creates the store, categories, products, and inventory — but NO customers or orders. The demo-orders seed (`prisma/seed-orders.ts`) fills that gap so the dashboard's "Recent orders" table, the AI insights growth %, and the Active Carts & Recovery feed all have realistic data.
+
+- **6 customers** — also used by the abandonment feed.
+- **~40 orders** — spread across THIS month and LAST month, weighted so Electronics leads growth (~+42–50%), followed by Fashion — exactly the story the AI insights demo tells.
+
+### How to run
+
+```bash
+npm run db:seed-orders
+```
+
+Requires `npm run db:seed` to have been run first (it needs the store, categories, and products).
+
+### Is it safe to run again?
+
+Yes. It is **idempotent** — it upserts customers by `[storeId, email]` and skips orders whose `orderNumber` already exists. It never deletes existing orders/customers. Re-running after a month boundary simply adds more orders to the new "this month".
+
+## Commands
+
+| Command | Description |
+|---------|-------------|
+| `npm install` | Install dependencies |
+| `npm run dev` | Start the dev server (http://localhost:3000) |
+| `npm run build` | Production build |
+| `npm run start` | Start the production server (after `build`) |
+| `npm run lint` | Run ESLint |
+| `npm test` | Run the unit test suite (Node native test runner) |
+| `npm run db:seed` | Seed demo store, categories, products, and inventory |
+| `npm run db:seed-orders` | Seed demo customers and orders (run after `db:seed`) |
+| `npm run set-admin -- <clerkUserId>` | Grant the admin role on a Clerk user |
+| `npm run set-admin -- <clerkUserId> --remove` | Revoke the admin role on a Clerk user |
+| `npx prisma db push` | Sync the Prisma schema to the database |
+| `npx prisma db seed` | Run the Prisma seed (equivalent to `npm run db:seed`) |
+| `npx prisma generate` | Generate the Prisma Client |
+| `npx prisma validate` | Validate the Prisma schema |
+| `npx prisma studio` | Open Prisma Studio (database browser) |
+| `npx prisma migrate dev` | Create and apply a new migration (development) |
+| `npx prisma migrate deploy` | Apply pending migrations (production) |
+| `npx tsc --noEmit` | Type-check the project without emitting files |

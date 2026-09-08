@@ -4,12 +4,14 @@ import Link from "next/link"
 import { Bell, ExternalLink } from "lucide-react"
 import { UserButton } from "@clerk/nextjs"
 import { Button } from "@/components/ui/button"
+import { AskShopNova } from "@/components/layout/ask-shopnova"
 
 export function Topbar() {
   return (
     <header className="flex h-14 items-center gap-4 border-b bg-background px-6">
       <div className="flex-1" aria-hidden="true" />
       <div className="flex items-center gap-2">
+        <AskShopNova />
         <Link
           href="/"
           className="inline-flex h-8 items-center gap-1.5 rounded-lg border border-transparent px-2.5 text-sm font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
