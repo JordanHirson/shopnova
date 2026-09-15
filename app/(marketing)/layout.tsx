@@ -47,7 +47,12 @@ export default async function MarketingLayout({
               href="/"
               className="flex shrink-0 items-center gap-2 font-semibold"
             >
-              <Package className="h-5 w-5" />
+              <span
+                className="flex h-7 w-7 items-center justify-center rounded-lg text-primary-foreground"
+                style={{ backgroundColor: "var(--primary)" }}
+              >
+                <Package className="h-4 w-4" />
+              </span>
               <span>ShopNova</span>
             </Link>
             <nav className="hidden items-center gap-6 text-sm font-medium md:flex">

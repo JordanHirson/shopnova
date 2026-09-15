@@ -40,10 +40,6 @@ export default async function SettingsPage() {
             <ThemeCustomizer initialTheme={theme} />
           </div>
         </div>
-
-        <div className="rounded-lg border p-12 text-center text-muted-foreground">
-          <p>More settings coming soon.</p>
-        </div>
       </section>
     </Container>
   )

@@ -103,11 +103,15 @@ export function normalizeHex(value: string | null | undefined): string | null {
 
 /**
  * Builds the CSS declarations that apply a store's theme to the storefront.
+ * Sets both the color and its `-foreground` pair so accent-colored elements
+ * (sale badges, the cart badge, etc.) render with readable white text.
  * Returns a string suitable for a `<style>` tag scoped to `:root`.
  */
 export function themeCssText(theme: StoreTheme): string {
   return [
     `--primary: ${theme.primaryColor};`,
+    `--primary-foreground: #ffffff;`,
     `--accent: ${theme.accentColor};`,
+    `--accent-foreground: #ffffff;`,
   ].join(" ")
 }

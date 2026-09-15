@@ -75,3 +75,9 @@ Before completing a task:
 - Keep the codebase consistent.
 - Summarize what changed.
 - Do not continue beyond the requested milestone.
+- update the README.md with any new information or changes
+- update PROJECT.md with any new information or changes
+- update .env.example with any new environment variables
+
+- never change the GUIDEBOOK.md file
+- never change the AGENTS.md file

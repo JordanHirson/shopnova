@@ -77,9 +77,14 @@ export default async function ProductDetailsPage({
                 R {displayPrice.toFixed(2)}
               </p>
               {hasSale && (
-                <p className="text-lg text-muted-foreground line-through">
-                  R {compareAt!.toFixed(2)}
-                </p>
+                <>
+                  <p className="text-lg text-muted-foreground line-through">
+                    R {compareAt!.toFixed(2)}
+                  </p>
+                  <span className="rounded-md bg-accent px-2 py-0.5 text-xs font-semibold uppercase tracking-wide text-accent-foreground">
+                    Sale
+                  </span>
+                </>
               )}
             </div>
             {product.description && (

@@ -16,8 +16,22 @@ export default async function HomePage() {
   return (
     <div>
       {/* Hero */}
-      <section className="border-b bg-gradient-to-b from-primary/5 to-background">
-        <Container className="flex flex-col items-center gap-6 py-20 text-center sm:py-28">
+      <section className="relative overflow-hidden border-b">
+        <div className="absolute inset-0 bg-gradient-to-b from-primary/10 via-accent/5 to-background" />
+        <div
+          className="absolute -top-24 left-1/2 h-72 w-72 -translate-x-1/2 rounded-full opacity-20 blur-3xl"
+          style={{ backgroundColor: "var(--accent)" }}
+          aria-hidden
+        />
+        <Container className="relative flex flex-col items-center gap-6 py-20 text-center sm:py-28">
+          <span className="inline-flex items-center gap-2 rounded-full border bg-background/80 px-3 py-1 text-xs font-medium text-muted-foreground backdrop-blur">
+            <span
+              className="h-1.5 w-1.5 rounded-full"
+              style={{ backgroundColor: "var(--accent)" }}
+              aria-hidden
+            />
+            New arrivals every week
+          </span>
           <h1 className="max-w-2xl text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
             Discover products you will love
           </h1>
@@ -61,8 +75,13 @@ export default async function HomePage() {
                 <Link
                   key={category.id}
                   href={`/categories/${category.slug}`}
-                  className="group flex flex-col gap-1 rounded-lg border bg-background p-5 transition-shadow hover:shadow-md"
+                  className="group relative flex flex-col gap-1 overflow-hidden rounded-xl border bg-card p-5 transition-all hover:shadow-md hover:border-primary/30"
                 >
+                  <span
+                    className="absolute inset-x-0 top-0 h-1 origin-left scale-x-0 transition-transform duration-300 group-hover:scale-x-100"
+                    style={{ backgroundColor: "var(--accent)" }}
+                    aria-hidden
+                  />
                   <h3 className="font-medium text-foreground group-hover:text-primary">
                     {category.name}
                   </h3>

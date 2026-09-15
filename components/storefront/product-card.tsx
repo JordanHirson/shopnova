@@ -29,7 +29,7 @@ export function ProductCard({ product, highlights }: ProductCardProps) {
   return (
     <Link
       href={`/products/${product.slug}`}
-      className="group flex flex-col overflow-hidden rounded-lg border bg-background transition-shadow hover:shadow-md"
+      className="group flex flex-col overflow-hidden rounded-xl border bg-card transition-all hover:shadow-lg hover:border-primary/30"
     >
       <div className="relative aspect-square w-full overflow-hidden bg-muted">
         {image ? (
@@ -37,19 +37,24 @@ export function ProductCard({ product, highlights }: ProductCardProps) {
           <img
             src={image.url}
             alt={image.alt ?? product.name}
-            className="h-full w-full object-cover transition-transform group-hover:scale-105"
+            className="h-full w-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
         ) : (
           <div className="flex h-full w-full items-center justify-center">
             <ImageIcon className="h-10 w-10 text-muted-foreground/40" />
           </div>
         )}
+        {hasSale && (
+          <span className="absolute left-2 top-2 rounded-md bg-accent px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-accent-foreground shadow-sm">
+            Sale
+          </span>
+        )}
       </div>
       <div className="flex flex-1 flex-col gap-1 p-4">
         <p className="text-xs font-medium text-muted-foreground">
           {product.category.name}
         </p>
-        <h3 className="font-medium text-foreground line-clamp-1">
+        <h3 className="font-medium text-foreground line-clamp-1 group-hover:text-primary">
           {product.name}
         </h3>
         {highlights && highlights.length > 0 && (
@@ -65,7 +70,7 @@ export function ProductCard({ product, highlights }: ProductCardProps) {
           </div>
         )}
         <div className="mt-auto flex items-baseline gap-2 pt-2">
-          <p className="text-sm font-semibold text-foreground">
+          <p className="text-base font-semibold text-foreground">
             R {product.price.toString()}
           </p>
           {hasSale && (

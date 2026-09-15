@@ -271,7 +271,7 @@ const CATALOGS: Record<MockSource, UpstreamProduct[]> = {
       externalId: "takealot-PLID9804",
       title: "Cadbury Dairy Milk Slab 80g",
       description:
-        "Classic milk chocolate slab. Pack of 12. Halaal certified.",
+        "Classic milk chocolate slab. Pack of 12.",
       price: 159.0,
       sku: "TKL-CDB-804",
       imageUrl:

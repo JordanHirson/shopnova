@@ -28,8 +28,13 @@ export default async function CategoriesPage() {
               <Link
                 key={category.id}
                 href={`/categories/${category.slug}`}
-                className="group flex flex-col gap-1 rounded-lg border bg-background p-6 transition-shadow hover:shadow-md"
+                className="group relative flex flex-col gap-1 overflow-hidden rounded-xl border bg-card p-6 transition-all hover:shadow-md hover:border-primary/30"
               >
+                <span
+                  className="absolute inset-x-0 top-0 h-1 origin-left scale-x-0 transition-transform duration-300 group-hover:scale-x-100"
+                  style={{ backgroundColor: "var(--accent)" }}
+                  aria-hidden
+                />
                 <h2 className="font-semibold text-foreground group-hover:text-primary">
                   {category.name}
                 </h2>
