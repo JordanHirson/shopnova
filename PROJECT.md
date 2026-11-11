@@ -147,7 +147,7 @@ scripts/          # Utility scripts (set-admin, test loader)
 - **Navigation:** The dashboard uses its own sidebar/topbar layout (`(dashboard)` route group) so admin nav never clutters the storefront. An `AdminLink` server component in the storefront header renders an "Admin" link only for admins (UI convenience only — not the security boundary). The dashboard topbar has a "View store" link back to the storefront.
 - **Existing data:** The schema change is additive and safe. Existing products default to `archived = false`. No demo data, orders, or payment records were modified.
 - **Tests:** 12 admin-logic tests (`features/admin/admin-logic.test.ts`) covering role matching (exact, case-sensitive), metadata extraction, `assertAdminRole` throw behavior, and order-status rules (PENDING/REFUNDED rejected, invalid inputs rejected). Total test suite: 83 tests.
-- **Verification:** `npx prisma validate`, `npx prisma db push`, `npm test` (83 tests), `npx tsc --noEmit`, `npx eslint .` (0 errors), `npx next build`, manual dev-server route check (unauthenticated `/dashboard*` → 307 redirect to sign-in; storefront home/products → 200).
+- **Verification:** `npx prisma validate`, `npx prisma migrate deploy`, `npm test` (83 tests), `npx tsc --noEmit`, `npx eslint .` (0 errors), `npx next build`, manual dev-server route check (unauthenticated `/dashboard*` → 307 redirect to sign-in; storefront home/products → 200).
 
 ## Product Search (Sprint 6)
 
@@ -208,7 +208,7 @@ The previous milestone implemented Yoco and the Stitch/Svix webhook foundation, 
 
 ## Storefront Theming (Demo Step 1)
 
-- **Schema (additive):** `Store.themePreset` (VarChar 50), `Store.primaryColor` (VarChar 7), `Store.accentColor` (VarChar 7) — all nullable so existing stores keep the default theme. Migration: `prisma/migrations/20260903010000_add_store_theme`.
+- **Schema (additive):** `Store.themePreset` (VarChar 50), `Store.primaryColor` (VarChar 7), `Store.accentColor` (VarChar 7) — all nullable so existing stores keep the default theme. Included in baseline migration `prisma/migrations/20260901000000_init`.
 - **Source of truth:** `lib/theme.ts` centralizes the three selectable presets (`Modern Slate`, `Warm Artisan`, `Neon Cyber`), their default hex colors, `resolveStoreTheme` (falls back to the default preset when any field is missing/invalid), `normalizeHex` (validates `#rrggbb`), `isThemePresetName`, and `themeCssText` (builds the `--primary`/`--accent` CSS declarations).
 - **Application:** the storefront layout reads the default store's theme via `resolveStoreTheme` and injects the resolved colors into `:root` CSS variables so the entire storefront (buttons, accents, links) re-skins instantly. The dashboard is unaffected.
 - **Dashboard customizer:** `/dashboard/settings` (admin-gated via `requireAdminOrRedirect()`) renders the `ThemeCustomizer` (`app/(dashboard)/dashboard/settings/theme-customizer.tsx`) — preset selector buttons + custom color pickers. Saving calls `updateStoreThemeAction` (`app/(dashboard)/dashboard/settings/actions.ts`), which re-validates with `storeThemeSchema` (`lib/validations/store.ts`), normalizes inputs server-side via `updateDefaultStoreTheme` (`lib/db/store.ts`), and `revalidatePath("/", "layout")` so the storefront updates immediately.
@@ -287,7 +287,7 @@ The main seed (`prisma/seed.ts`) creates the store, categories, products, and in
 | `npm run db:seed-orders` | Seed demo customers and orders (run after `db:seed`) |
 | `npm run set-admin -- <clerkUserId>` | Grant the admin role on a Clerk user |
 | `npm run set-admin -- <clerkUserId> --remove` | Revoke the admin role on a Clerk user |
-| `npx prisma db push` | Sync the Prisma schema to the database |
+| `npx prisma migrate resolve --applied <migration>` | Mark an existing database as already migrated (e.g. `20260901000000_init` after adopting the baseline) |
 | `npx prisma db seed` | Run the Prisma seed (equivalent to `npm run db:seed`) |
 | `npx prisma generate` | Generate the Prisma Client |
 | `npx prisma validate` | Validate the Prisma schema |

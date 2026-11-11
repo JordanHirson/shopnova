@@ -42,11 +42,22 @@ ShopNova is a modern e-commerce platform built with Next.js (App Router), TypeSc
    - `STITCH_CLIENT_ID` + `STITCH_CLIENT_SECRET` + `STITCH_WEBHOOK_SECRET` — Stitch Pay By Bank (SA)
    - `OPENAI_API_KEY` (or `AI_API_KEY`) + optional `AI_BASE_URL` + `AI_MODEL` — AI product generation and insights (see [AI Features](#ai-features)). When unset, deterministic mock generators run so the demo always succeeds offline.
 
-3. Push the Prisma schema and generate the client:
+3. Apply the Prisma schema and generate the client:
 
    ```bash
-   npx prisma db push
+   npx prisma migrate deploy   # Creates the full schema on a new database
+   npx prisma generate         # Generate the Prisma Client
    ```
+
+   Already have a development database from before this change? Mark the baseline
+   migration as applied instead of re-creating tables:
+
+   ```bash
+   npx prisma migrate resolve --applied 20260901000000_init
+   ```
+
+   From then on, make every schema change with `npx prisma migrate dev`
+   (not `npx prisma db push`).
 
 4. Seed demo data:
 
@@ -238,9 +249,14 @@ See `.env.example` for provider-specific examples (OpenAI, Google Gemini, Groq, 
 ## Database Setup
 
 ```bash
-npx prisma db push   # Sync schema to database
-npm run db:seed      # Seed demo data
+npx prisma migrate deploy   # Apply migrations (full schema on a new database)
+npx prisma generate         # Generate the Prisma Client
+npm run db:seed             # Seed demo data
 ```
+
+> Existing local database from before the migration baseline? Run
+> `npx prisma migrate resolve --applied 20260901000000_init` once to mark it
+> as migrated, then use `npx prisma migrate dev` for any further schema changes.
 
 ## Seeding Demo Data
 
@@ -303,7 +319,7 @@ Yes. It is **idempotent** — it upserts customers by `[storeId, email]` and ski
 | `npm run db:seed-orders` | Seed demo customers and orders (run after `db:seed`) |
 | `npm run set-admin -- <clerkUserId>` | Grant the admin role on a Clerk user |
 | `npm run set-admin -- <clerkUserId> --remove` | Revoke the admin role on a Clerk user |
-| `npx prisma db push` | Sync the Prisma schema to the database |
+| `npx prisma migrate resolve --applied <migration>` | Mark an existing database as already migrated (e.g. `20260901000000_init` after adopting the baseline) |
 | `npx prisma db seed` | Run the Prisma seed (equivalent to `npm run db:seed`) |
 | `npx prisma generate` | Generate the Prisma Client |
 | `npx prisma validate` | Validate the Prisma schema |
