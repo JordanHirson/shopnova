@@ -1,5 +1,5 @@
 import { prisma } from "./prisma"
-import { normalizeHex, isThemePresetName, DEFAULT_THEME_PRESET } from "@/lib/theme"
+import { normalizeHex, isThemePresetName, DEFAULT_THEME_PRESET } from "../theme.ts"
 
 /**
  * Returns the first store in the database.

@@ -80,6 +80,61 @@ export const ADMIN_ORDER_STATUSES = [
 export type AdminOrderStatus = (typeof ADMIN_ORDER_STATUSES)[number]
 
 /**
+ * Allowed order fulfillment status transitions: current status → next statuses
+ * an admin may move it to.
+ *
+ * CONFIRMED → PROCESSING or CANCELLED
+ * PROCESSING → SHIPPED or CANCELLED
+ * SHIPPED → DELIVERED
+ * DELIVERED and CANCELLED are final (no outgoing transitions).
+ *
+ * Anything not listed is blocked — including staying in the same status — so
+ * an order can only be cancelled once and can never be edited after it is
+ * delivered or cancelled. PENDING and REFUNDED are not admin-settable
+ * (payment state is driven by verified webhooks only), so they have no
+ * outgoing admin transitions either.
+ */
+export const ORDER_TRANSITIONS: ReadonlyMap<
+  AdminOrderStatus,
+  readonly AdminOrderStatus[]
+> = new Map([
+  ["CONFIRMED", ["PROCESSING", "CANCELLED"]],
+  ["PROCESSING", ["SHIPPED", "CANCELLED"]],
+  ["SHIPPED", ["DELIVERED"]],
+  ["DELIVERED", []],
+  ["CANCELLED", []],
+])
+
+/**
+ * Returns true when an admin may move an order from `from` to `to`.
+ * Pure, side-effect-free — safe to unit test without a database.
+ */
+export function isAllowedOrderTransition(
+  from: AdminOrderStatus,
+  to: AdminOrderStatus
+): boolean {
+  return ORDER_TRANSITIONS.get(from)?.includes(to) ?? false
+}
+
+/**
+ * Returns the statuses an admin may set next for an order in `currentStatus`.
+ * Empty when the status is final (DELIVERED / CANCELLED). Drives the admin
+ * status dropdown so only valid transitions are offered.
+ */
+export function getValidNextStatuses(
+  currentStatus: AdminOrderStatus
+): readonly AdminOrderStatus[] {
+  return ORDER_TRANSITIONS.get(currentStatus) ?? []
+}
+
+/**
+ * Returns true when no further admin status changes are allowed for `status`.
+ */
+export function isFinalOrderStatus(status: AdminOrderStatus): boolean {
+  return getValidNextStatuses(status).length === 0
+}
+
+/**
  * Returns true when the given value is a status an admin may set.
  * Note: PENDING and REFUNDED are intentionally excluded — PENDING is the
  * pre-payment state and REFUNDED must be driven by payment/webhook logic,

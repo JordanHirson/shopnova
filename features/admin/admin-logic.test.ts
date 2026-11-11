@@ -20,9 +20,14 @@ import {
   ADMIN_ROLE,
   AdminRequiredError,
   assertAdminRole,
+  type AdminOrderStatus,
+  getValidNextStatuses,
+  isAllowedOrderTransition,
   isAdminOrderStatus,
   isAdminRole,
+  isFinalOrderStatus,
   normalizeOrderStatus,
+  ORDER_TRANSITIONS,
   roleFromMetadata,
 } from "./admin-logic.ts"
 
@@ -125,4 +130,84 @@ test("normalizeOrderStatus returns the status when valid, null otherwise", () =>
   assert.equal(normalizeOrderStatus(null), null)
   assert.equal(normalizeOrderStatus(undefined), null)
   assert.equal(normalizeOrderStatus(42), null)
+})
+
+// ═══ Order status transitions ═══
+
+const ALLOWED: Array<[AdminOrderStatus, AdminOrderStatus]> = [
+  ["CONFIRMED", "PROCESSING"],
+  ["CONFIRMED", "CANCELLED"],
+  ["PROCESSING", "SHIPPED"],
+  ["PROCESSING", "CANCELLED"],
+  ["SHIPPED", "DELIVERED"],
+]
+
+const BLOCKED: Array<[AdminOrderStatus, AdminOrderStatus]> = [
+  // Skipping steps is not allowed.
+  ["CONFIRMED", "SHIPPED"],
+  ["CONFIRMED", "DELIVERED"],
+  ["PROCESSING", "DELIVERED"],
+  // No backwards moves.
+  ["PROCESSING", "CONFIRMED"],
+  ["SHIPPED", "PROCESSING"],
+  ["DELIVERED", "SHIPPED"],
+  // Final statuses: nothing leaves them (including staying put).
+  ["DELIVERED", "CONFIRMED"],
+  ["DELIVERED", "CANCELLED"],
+  ["DELIVERED", "DELIVERED"],
+  ["CANCELLED", "CONFIRMED"],
+  ["CANCELLED", "PROCESSING"],
+  ["CANCELLED", "SHIPPED"],
+  ["CANCELLED", "DELIVERED"],
+  ["CANCELLED", "CANCELLED"], // cancelling twice is blocked
+  // Staying put is never a valid transition.
+  ["CONFIRMED", "CONFIRMED"],
+  ["PROCESSING", "PROCESSING"],
+  ["SHIPPED", "SHIPPED"],
+]
+
+test("isAllowedOrderTransition allows every documented forward transition", () => {
+  for (const [from, to] of ALLOWED) {
+    assert.equal(
+      isAllowedOrderTransition(from, to),
+      true,
+      `${from} → ${to} should be allowed`
+    )
+  }
+})
+
+test("isAllowedOrderTransition blocks every non-documented transition", () => {
+  for (const [from, to] of BLOCKED) {
+    assert.equal(
+      isAllowedOrderTransition(from, to),
+      false,
+      `${from} → ${to} should be blocked`
+    )
+  }
+})
+
+test("getValidNextStatuses returns exactly the documented next statuses", () => {
+  assert.deepEqual(getValidNextStatuses("CONFIRMED"), ["PROCESSING", "CANCELLED"])
+  assert.deepEqual(getValidNextStatuses("PROCESSING"), ["SHIPPED", "CANCELLED"])
+  assert.deepEqual(getValidNextStatuses("SHIPPED"), ["DELIVERED"])
+  assert.deepEqual(getValidNextStatuses("DELIVERED"), [])
+  assert.deepEqual(getValidNextStatuses("CANCELLED"), [])
+})
+
+test("isFinalOrderStatus is true only for DELIVERED and CANCELLED", () => {
+  assert.equal(isFinalOrderStatus("DELIVERED"), true)
+  assert.equal(isFinalOrderStatus("CANCELLED"), true)
+  assert.equal(isFinalOrderStatus("CONFIRMED"), false)
+  assert.equal(isFinalOrderStatus("PROCESSING"), false)
+  assert.equal(isFinalOrderStatus("SHIPPED"), false)
+})
+
+test("ORDER_TRANSITIONS covers every admin-settable status", () => {
+  for (const status of ADMIN_ORDER_STATUSES) {
+    assert.equal(
+      ORDER_TRANSITIONS.has(status),
+      true,
+      `${status} must have a transition entry`
+    )
+  }
 })

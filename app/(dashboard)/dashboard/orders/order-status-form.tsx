@@ -12,6 +12,8 @@ import {
 } from "@/components/ui/select"
 import {
   ADMIN_ORDER_STATUSES,
+  getValidNextStatuses,
+  isFinalOrderStatus,
   type AdminOrderStatus,
 } from "@/features/admin/admin-logic"
 import {
@@ -25,13 +27,19 @@ interface OrderStatusFormProps {
 }
 
 export function OrderStatusForm({ orderNumber, currentStatus }: OrderStatusFormProps) {
-  const [status, setStatus] = useState<AdminOrderStatus | "">(
+  const validNextStatuses = getValidNextStatuses(
     (ADMIN_ORDER_STATUSES as readonly string[]).includes(currentStatus)
       ? (currentStatus as AdminOrderStatus)
-      : ""
+      : "CONFIRMED"
   )
+  const [status, setStatus] = useState<AdminOrderStatus | "">("")
   const [error, setError] = useState<string | undefined>()
   const [isPending, startTransition] = useTransition()
+  const isFinal = isFinalOrderStatus(
+    (ADMIN_ORDER_STATUSES as readonly string[]).includes(currentStatus)
+      ? (currentStatus as AdminOrderStatus)
+      : "CONFIRMED"
+  )
 
   function handleSubmit(formData: FormData) {
     setError(undefined)
@@ -52,24 +60,32 @@ export function OrderStatusForm({ orderNumber, currentStatus }: OrderStatusFormP
     <form action={handleSubmit} className="flex flex-col gap-3 sm:flex-row sm:items-center">
       <input type="hidden" name="orderNumber" value={orderNumber} />
       <input type="hidden" name="status" value={status} />
-      <Select
-        value={status}
-        onValueChange={(value) => setStatus(value as AdminOrderStatus)}
-      >
-        <SelectTrigger className="w-full sm:w-48">
-          <SelectValue placeholder="Select status" />
-        </SelectTrigger>
-        <SelectContent>
-          {ADMIN_ORDER_STATUSES.map((s) => (
-            <SelectItem key={s} value={s}>
-              {s.charAt(0) + s.slice(1).toLowerCase()}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-      <Button type="submit" disabled={isPending || !status}>
-        {isPending ? "Saving..." : "Update status"}
-      </Button>
+      {isFinal ? (
+        <p className="text-sm text-muted-foreground">
+          No further status changes are available — {currentStatus.charAt(0) + currentStatus.slice(1).toLowerCase()} is final.
+        </p>
+      ) : (
+        <>
+          <Select
+            value={status}
+            onValueChange={(value) => setStatus(value as AdminOrderStatus)}
+          >
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Select status" />
+            </SelectTrigger>
+            <SelectContent>
+              {validNextStatuses.map((s) => (
+                <SelectItem key={s} value={s}>
+                  {s.charAt(0) + s.slice(1).toLowerCase()}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button type="submit" disabled={isPending || !status}>
+            {isPending ? "Saving..." : "Update status"}
+          </Button>
+        </>
+      )}
       {error && <p className="text-sm text-destructive">{error}</p>}
     </form>
   )

@@ -276,6 +276,18 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
             not change payment state.
           </p>
         ) : null}
+        {order.status === "CANCELLED" && isPaid ? (
+          <div className="mt-3 rounded-md bg-amber-50 border border-amber-200 p-3">
+            <p className="font-medium text-amber-900">Refund required</p>
+            <p className="mt-1 text-sm text-amber-800">
+              This cancelled order has a succeeded payment of{" "}
+              {formatCurrency(Number(order.total), order.currency)}. Payment
+              state is set by verified gateway webhooks and cannot be changed
+              from this page — process the refund through your payment gateway;
+              the payment record will update on the next verified webhook.
+            </p>
+          </div>
+        ) : null}
       </div>
     </Container>
   )

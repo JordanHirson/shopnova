@@ -15,7 +15,40 @@
  */
 import { prisma } from "./prisma"
 import { getDefaultStoreId } from "./store"
-import type { AdminOrderStatus } from "@/features/admin/admin-logic"
+import {
+  isAllowedOrderTransition,
+  type AdminOrderStatus,
+} from "../../features/admin/admin-logic.ts"
+import type { Prisma } from "@prisma/client"
+
+/**
+ * Minimal Prisma client surface used by `updateOrderStatusTx`. Kept narrow so
+ * the function can be unit-tested with a fake client instead of a database.
+ */
+export interface OrderInventoryClient {
+  order: {
+    findFirst(args: Prisma.OrderFindFirstArgs): Promise<unknown>
+    update(args: Prisma.OrderUpdateArgs): Promise<unknown>
+  }
+  inventory: {
+    update(args: Prisma.InventoryUpdateArgs): Promise<unknown>
+  }
+  $transaction: <T>(fn: (tx: OrderInventoryClient) => Promise<T>) => Promise<T>
+}
+
+/** Order loaded with its items and their product inventory, for cancellation. */
+export interface LoadedOrder {
+  orderNumber: string
+  status: string
+  items: Array<{
+    quantity: number
+    productId: string
+    product: {
+      id: string
+      inventory: { quantity: number } | null
+    } | null
+  }>
+}
 
 /** KPI overview for the admin dashboard home page. */
 export interface AdminOverview {
@@ -182,9 +215,77 @@ export async function getOrderForAdmin(orderNumber: string) {
 }
 
 /**
+ * Updates an order's fulfillment status inside a database transaction.
+ *
+ * - Rejects any transition that is not allowed by `isAllowedOrderTransition`
+ *   (so an order can only be cancelled once, and never leaves DELIVERED or
+ *   CANCELLED).
+ * - When the order moves to CANCELLED, each item's quantity is added back to
+ *   its product's inventory in the SAME transaction as the status change, so
+ *   stock is never lost and never returned twice.
+ * - Payment status is never touched here.
+ *
+ * `tx` is injected so this can be unit-tested with a fake client.
+ */
+export async function updateOrderStatusTx(
+  tx: OrderInventoryClient,
+  storeId: string,
+  orderNumber: string,
+  status: AdminOrderStatus
+) {
+  // 1. Load the current order, scoped by store, with items + inventory.
+  const current = (await tx.order.findFirst({
+    where: { orderNumber, storeId },
+    include: {
+      items: {
+        include: {
+          product: {
+            select: { id: true, inventory: { select: { quantity: true } } },
+          },
+        },
+      },
+    },
+  })) as LoadedOrder | null
+
+  if (!current) {
+    throw new Error("Order not found.")
+  }
+
+  // 2. Guard: only allowed transitions may proceed. CANCELLED → CANCELLED is
+  //    blocked because CANCELLED is final, so stock can only be restocked once.
+  if (!isAllowedOrderTransition(current.status as AdminOrderStatus, status)) {
+    throw new Error(
+      `Cannot transition order ${orderNumber} from "${current.status}" to "${status}".`
+    )
+  }
+
+  // 3. Status change + restock atomically.
+  return tx.$transaction(async (innerTx) => {
+    const updated = await innerTx.order.update({
+      where: { orderNumber, storeId },
+      data: { status },
+    })
+
+    if (status === "CANCELLED") {
+      // Return each purchased quantity to inventory, exactly once per item.
+      for (const item of current.items) {
+        const inventory = item.product?.inventory
+        if (!inventory) continue
+        await innerTx.inventory.update({
+          where: { productId: item.productId },
+          data: { quantity: { increment: item.quantity } },
+        })
+      }
+    }
+
+    return updated
+  })
+}
+
+/**
  * Updates an order's fulfillment status. Only admin-settable statuses are
- * accepted (see features/admin/admin-logic.ts); the caller must validate the
- * status before calling. Payment status is never touched here.
+ * accepted (see features/admin/admin-logic.ts). Payment status is never
+ * touched here.
  */
 export async function updateOrderStatus(
   orderNumber: string,
@@ -195,18 +296,7 @@ export async function updateOrderStatus(
     throw new Error("No store found.")
   }
 
-  // Scope by store + orderNumber so a cross-store order number can never be
-  // mutated. updateMany returns count 0 when the order doesn't exist.
-  const result = await prisma.order.updateMany({
-    where: { orderNumber, storeId },
-    data: { status },
-  })
-
-  if (result.count === 0) {
-    throw new Error("Order not found.")
-  }
-
-  return result
+  return updateOrderStatusTx(prisma, storeId, orderNumber, status)
 }
 
 /**
