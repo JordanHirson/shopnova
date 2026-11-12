@@ -10,7 +10,12 @@ import {
 } from "@/components/ui/table"
 import { listProducts, listCategories } from "@/lib/db"
 import { requireAdminOrRedirect } from "@/lib/auth/admin"
-import { ProductForm, DeleteProductButton, RestoreProductButton, PermanentlyDeleteProductButton } from "./product-form"
+import { ProductForm } from "./product-form"
+import {
+  DeleteProductButton,
+  RestoreProductButton,
+  PermanentlyDeleteProductButton,
+} from "./product-form-actions"
 
 export const dynamic = "force-dynamic"
 
