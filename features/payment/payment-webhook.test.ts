@@ -177,6 +177,26 @@ test("PayFast: an invalid signature is rejected", async () => {
   await assert.rejects(provider.handleWebhook(body, {}, {}), /Invalid PayFast signature/)
 })
 
+test("PayFast: a wrong signature of the same length is rejected", async () => {
+  const { PayFastProvider, signPayFast } = await importPayFast()
+  const provider = new PayFastProvider()
+
+  const fields: Record<string, string> = {
+    m_payment_id: "intent-pf-5",
+    pf_payment_id: "pf_pay_5",
+    payment_status: "COMPLETE",
+    amount_gross: "115.00",
+  }
+  const expected = signPayFast(fields)
+  // Same length as a real MD5 hex digest (32 chars) but a wrong value,
+  // exercising the timingSafeEqual branch rather than the length check.
+  const last = expected[expected.length - 1]
+  const wrongSignature = expected.slice(0, -1) + (last === "0" ? "1" : "0")
+  const body = new URLSearchParams({ ...fields, signature: wrongSignature }).toString()
+
+  await assert.rejects(provider.handleWebhook(body, {}, {}), /Invalid PayFast signature/)
+})
+
 test("PayFast: a missing signature is rejected", async () => {
   const { PayFastProvider } = await importPayFast()
   const provider = new PayFastProvider()

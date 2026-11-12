@@ -76,7 +76,7 @@ Before completing a task:
 - Summarize what changed.
 - Do not continue beyond the requested milestone.
 - update the README.md with any new information or changes
-- update PROJECT.md with any new information or changes
+- update PROJECT.md with any new information or changes including changes to the test count
 - update .env.example with any new environment variables
 
 - never change the GUIDEBOOK.md file

@@ -14,7 +14,7 @@
  */
 import "server-only"
 
-import { createHash } from "crypto"
+import { createHash, timingSafeEqual } from "crypto"
 
 import type {
   PaymentNotification,
@@ -103,7 +103,7 @@ export class PayFastProvider implements PaymentProvider {
       throw new Error("Missing PayFast signature.")
     }
     const expected = signPayFast(fields)
-    if (signature !== expected) {
+    if (!safeEqual(signature, expected)) {
       throw new Error("Invalid PayFast signature.")
     }
 
@@ -150,4 +150,16 @@ export function signPayFast(
   }
 
   return createHash("md5").update(sorted.join("&")).digest("hex")
+}
+
+/**
+ * Constant-time comparison of two signature strings. The length check is
+ * required because `timingSafeEqual` throws when the inputs differ in
+ * length; it also rejects wrong-length candidates without leaking whether
+ * the length or the content mismatched.
+ */
+function safeEqual(a: string, b: string): boolean {
+  const ab = Buffer.from(a)
+  const bb = Buffer.from(b)
+  return ab.length === bb.length && timingSafeEqual(ab, bb)
 }
