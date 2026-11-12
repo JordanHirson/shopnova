@@ -255,8 +255,7 @@ export class StitchProvider implements PaymentProvider {
 
   async handleWebhook(
     body: string,
-    headers: Record<string, string>,
-    _query: Record<string, string>
+    headers: Record<string, string>
   ): Promise<PaymentNotification | null> {
     if (!STITCH_WEBHOOK_SECRET) {
       throw new Error("Stitch is not configured on the server.")

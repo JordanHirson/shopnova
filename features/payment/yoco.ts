@@ -112,8 +112,7 @@ export class YocoProvider implements PaymentProvider {
 
   async handleWebhook(
     body: string,
-    headers: Record<string, string>,
-    _query: Record<string, string>
+    headers: Record<string, string>
   ): Promise<PaymentNotification | null> {
     if (!this.isConfigured()) {
       throw new Error("Yoco is not configured on the server.")

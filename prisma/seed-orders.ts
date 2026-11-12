@@ -259,7 +259,7 @@ async function main() {
 
     const customer = CUSTOMERS[plan.customerIndex % CUSTOMERS.length]
 
-    const order = await prisma.order.create({
+    await prisma.order.create({
       data: {
         orderNumber,
         status: plan.status,

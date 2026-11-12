@@ -141,7 +141,7 @@ test("Yoco: a valid payment.succeeded webhook returns a success notification", a
     metadata: { intentId: "intent-yoco-2" },
   })
 
-  const notification = await provider.handleWebhook(body, webhookHeaders("webhook", signature), {})
+  const notification = await provider.handleWebhook(body, webhookHeaders("webhook", signature))
   assert.equal(notification?.success, true)
   assert.equal(notification?.payloadKey, "evt_1")
   assert.equal(notification?.providerReference, "pay_1")
@@ -162,7 +162,7 @@ test("Yoco: a payment.failed webhook is reported as not successful", async () =>
   })
   const signature = signStandardWebhook({ body, secret: WEBHOOK_SECRET, id: "evt_fail", timestamp: TIMESTAMP })
 
-  const notification = await provider.handleWebhook(body, webhookHeaders("webhook", signature, "evt_fail"), {})
+  const notification = await provider.handleWebhook(body, webhookHeaders("webhook", signature, "evt_fail"))
   assert.equal(notification?.success, false)
   assert.equal(notification?.errorCode, "yoco:payment_failed")
   assert.equal(notification?.intentId, "intent-yoco-3")
@@ -175,7 +175,7 @@ test("Yoco: an unhandled event type returns null (ignored, not an error)", async
   const body = JSON.stringify({ id: "evt_refund", type: "refund.succeeded", payload: {} })
   const signature = signStandardWebhook({ body, secret: WEBHOOK_SECRET, id: "evt_refund", timestamp: TIMESTAMP })
 
-  const notification = await provider.handleWebhook(body, webhookHeaders("webhook", signature, "evt_refund"), {})
+  const notification = await provider.handleWebhook(body, webhookHeaders("webhook", signature, "evt_refund"))
   assert.equal(notification, null)
 })
 
@@ -184,7 +184,7 @@ test("Yoco: an invalid signature is rejected", async () => {
   const provider = new YocoProvider()
 
   await assert.rejects(
-    provider.handleWebhook('{"id":"evt_1","type":"payment.succeeded"}', webhookHeaders("webhook", "v1,deadbeef="), {}),
+    provider.handleWebhook('{"id":"evt_1","type":"payment.succeeded"}', webhookHeaders("webhook", "v1,deadbeef=")),
     /Invalid Yoco signature/
   )
 })
@@ -194,7 +194,7 @@ test("Yoco: a missing signature is rejected", async () => {
   const provider = new YocoProvider()
 
   await assert.rejects(
-    provider.handleWebhook("{}", { "webhook-id": "evt_1", "webhook-timestamp": TIMESTAMP }, {}),
+    provider.handleWebhook("{}", { "webhook-id": "evt_1", "webhook-timestamp": TIMESTAMP }),
     /Invalid Yoco signature/
   )
 })
@@ -210,8 +210,7 @@ test("Yoco: a replayed (stale) webhook is rejected", async () => {
   await assert.rejects(
     provider.handleWebhook(
       body,
-      { "webhook-id": "evt_1", "webhook-timestamp": oldTs, "webhook-signature": oldSig },
-      {}
+      { "webhook-id": "evt_1", "webhook-timestamp": oldTs, "webhook-signature": oldSig }
     ),
     /Invalid Yoco signature/
   )
@@ -225,7 +224,7 @@ test("Yoco: a malformed (non-JSON) body is rejected after signature check", asyn
   const body = "not-json"
   const signature = signStandardWebhook({ body, secret: WEBHOOK_SECRET, id: "evt_1", timestamp: TIMESTAMP })
   await assert.rejects(
-    provider.handleWebhook(body, webhookHeaders("webhook", signature), {}),
+    provider.handleWebhook(body, webhookHeaders("webhook", signature)),
     SyntaxError
   )
 })
@@ -245,7 +244,7 @@ test("Yoco: a wrong-provider intent id in metadata is passed through (provider-m
     metadata: { intentId: "intent-created-for-stripe" },
   })
 
-  const notification = await provider.handleWebhook(body, webhookHeaders("webhook", signature), {})
+  const notification = await provider.handleWebhook(body, webhookHeaders("webhook", signature))
   assert.equal(notification?.intentId, "intent-created-for-stripe")
   assert.equal(notification?.success, true)
 })
@@ -584,8 +583,7 @@ test("Stitch: a valid PaymentInitiationRequestCompleted webhook returns a succes
   const provider = new StitchProvider()
 
   const body = stitchEventBody({ state: "PaymentInitiationRequestCompleted" })
-  const notification = await provider.handleWebhook(body, stitchSigned(body), {})
-
+  const notification = await provider.handleWebhook(body, stitchSigned(body))
   assert.equal(notification?.success, true)
   assert.equal(notification?.intentId, "intent-stitch-1")
   assert.equal(notification?.amountMinor, 11500)
@@ -600,8 +598,7 @@ test("Stitch: a Cancelled state is reported as not successful", async () => {
   const provider = new StitchProvider()
 
   const body = stitchEventBody({ state: "PaymentInitiationRequestCancelled" })
-  const notification = await provider.handleWebhook(body, stitchSigned(body), {})
-
+  const notification = await provider.handleWebhook(body, stitchSigned(body))
   assert.equal(notification?.success, false)
   assert.equal(notification?.errorCode, "stitch:payment_failed")
 })
@@ -611,8 +608,7 @@ test("Stitch: an Expired state is reported as not successful", async () => {
   const provider = new StitchProvider()
 
   const body = stitchEventBody({ state: "PaymentInitiationRequestExpired" })
-  const notification = await provider.handleWebhook(body, stitchSigned(body), {})
-
+  const notification = await provider.handleWebhook(body, stitchSigned(body))
   assert.equal(notification?.success, false)
   assert.equal(notification?.errorCode, "stitch:payment_failed")
 })
@@ -622,7 +618,7 @@ test("Stitch: a Pending (non-final) state is ignored (null)", async () => {
   const provider = new StitchProvider()
 
   const body = stitchEventBody({ state: "PaymentInitiationRequestPending" })
-  const notification = await provider.handleWebhook(body, stitchSigned(body), {})
+  const notification = await provider.handleWebhook(body, stitchSigned(body))
   assert.equal(notification, null)
 })
 
@@ -631,7 +627,7 @@ test("Stitch: an invalid Svix signature is rejected", async () => {
   const provider = new StitchProvider()
 
   await assert.rejects(
-    provider.handleWebhook(stitchEventBody(), webhookHeaders("svix", "v1,deadbeef="), {}),
+    provider.handleWebhook(stitchEventBody(), webhookHeaders("svix", "v1,deadbeef=")),
     /Invalid Stitch signature/
   )
 })
@@ -641,7 +637,7 @@ test("Stitch: a missing signature is rejected", async () => {
   const provider = new StitchProvider()
 
   await assert.rejects(
-    provider.handleWebhook("{}", { "svix-id": "msg_1", "svix-timestamp": TIMESTAMP }, {}),
+    provider.handleWebhook("{}", { "svix-id": "msg_1", "svix-timestamp": TIMESTAMP }),
     /Invalid Stitch signature/
   )
 })
@@ -654,7 +650,7 @@ test("Stitch: a Yoco-style (webhook-*) signature does not verify under the svix 
   // Sign with the Stitch secret but present the signature under webhook-* headers.
   const signature = signStandardWebhook({ body, secret: WEBHOOK_SECRET, id: "msg_1", timestamp: TIMESTAMP })
   await assert.rejects(
-    provider.handleWebhook(body, webhookHeaders("webhook", signature, "msg_1"), {}),
+    provider.handleWebhook(body, webhookHeaders("webhook", signature, "msg_1")),
     /Invalid Stitch signature/
   )
 })
@@ -664,7 +660,7 @@ test("Stitch: a delivery without a payment-initiation node is ignored", async ()
   const provider = new StitchProvider()
 
   const body = JSON.stringify({ data: { client: { refunds: { node: { id: "r_1" } } } } })
-  const notification = await provider.handleWebhook(body, stitchSigned(body), {})
+  const notification = await provider.handleWebhook(body, stitchSigned(body))
   assert.equal(notification, null)
 })
 
@@ -674,7 +670,7 @@ test("Stitch: amount quantity (major units / Rand) is converted to cents", async
 
   // R19.99 -> 1999 cents.
   const body = stitchEventBody({ amount: { currency: "ZAR", quantity: "19.99" } })
-  const notification = await provider.handleWebhook(body, stitchSigned(body), {})
+  const notification = await provider.handleWebhook(body, stitchSigned(body))
   assert.equal(notification?.amountMinor, 1999)
 })
 
@@ -685,7 +681,7 @@ test("Stitch: a malformed (non-JSON) body is rejected after signature check", as
   const body = "not-json"
   const signature = signStandardWebhook({ body, secret: WEBHOOK_SECRET, id: "msg_1", timestamp: TIMESTAMP })
   await assert.rejects(
-    provider.handleWebhook(body, webhookHeaders("svix", signature, "msg_1"), {}),
+    provider.handleWebhook(body, webhookHeaders("svix", signature, "msg_1")),
     SyntaxError
   )
 })
@@ -695,7 +691,7 @@ test("Stitch: a wrong-provider intent (externalReference) is passed through for 
   const provider = new StitchProvider()
 
   const body = stitchEventBody({ externalReference: "intent-created-for-yoco" })
-  const notification = await provider.handleWebhook(body, stitchSigned(body), {})
+  const notification = await provider.handleWebhook(body, stitchSigned(body))
   assert.equal(notification?.intentId, "intent-created-for-yoco")
 })
 
@@ -705,8 +701,8 @@ test("Stitch: duplicate deliveries share the Svix message id (idempotency key)",
 
   const body = stitchEventBody()
   // Same svix-id -> same payloadKey -> downstream completePaidIntent dedupes.
-  const n1 = await provider.handleWebhook(body, stitchSigned(body, "msg_dup"), {})
-  const n2 = await provider.handleWebhook(body, stitchSigned(body, "msg_dup"), {})
+  const n1 = await provider.handleWebhook(body, stitchSigned(body, "msg_dup"))
+  const n2 = await provider.handleWebhook(body, stitchSigned(body, "msg_dup"))
   assert.equal(n1?.payloadKey, "msg_dup")
   assert.equal(n2?.payloadKey, "msg_dup")
 })

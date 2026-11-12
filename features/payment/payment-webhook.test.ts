@@ -52,8 +52,7 @@ test("Stripe: a valid signature is accepted and the notification is returned", a
 
   const notification = await provider.handleWebhook(
     body,
-    { "stripe-signature": stripeSignature(body, "whsec_unit_secret") },
-    {}
+    { "stripe-signature": stripeSignature(body, "whsec_unit_secret") }
   )
 
   assert.equal(notification?.success, true)
@@ -70,7 +69,7 @@ test("Stripe: an invalid signature is rejected", async () => {
   const body = JSON.stringify({ id: "evt_bad", type: "checkout.session.completed", data: { object: {} } })
 
   await assert.rejects(
-    provider.handleWebhook(body, { "stripe-signature": "t=1,v1=deadbeef" }, {}),
+    provider.handleWebhook(body, { "stripe-signature": "t=1,v1=deadbeef" }),
     /Invalid Stripe signature/
   )
 })
@@ -80,7 +79,7 @@ test("Stripe: a missing signature is rejected", async () => {
   const provider = new StripeProvider()
 
   await assert.rejects(
-    provider.handleWebhook("{}", {}, {}),
+    provider.handleWebhook("{}", {}),
     /Missing Stripe signature/
   )
 })
@@ -104,8 +103,7 @@ test("Stripe: a failed payment event is reported as not successful", async () =>
 
   const notification = await provider.handleWebhook(
     body,
-    { "stripe-signature": stripeSignature(body, "whsec_unit_secret") },
-    {}
+    { "stripe-signature": stripeSignature(body, "whsec_unit_secret") }
   )
 
   assert.equal(notification?.success, false)
@@ -124,8 +122,7 @@ test("Stripe: an unhandled event type returns null (ignored, not an error)", asy
 
   const notification = await provider.handleWebhook(
     body,
-    { "stripe-signature": stripeSignature(body, "whsec_unit_secret") },
-    {}
+    { "stripe-signature": stripeSignature(body, "whsec_unit_secret") }
   )
 
   assert.equal(notification, null)
@@ -250,8 +247,7 @@ test("Test gateway: a valid signature is accepted and a success notification is 
 
   const notification = await provider.handleWebhook(
     body,
-    { "x-test-signature": testSignature(body, "test-unit-secret") },
-    {}
+    { "x-test-signature": testSignature(body, "test-unit-secret") }
   )
 
   assert.equal(notification?.success, true)
@@ -265,7 +261,7 @@ test("Test gateway: an invalid signature is rejected", async () => {
   const provider = new TestProvider()
 
   await assert.rejects(
-    provider.handleWebhook("{}", { "x-test-signature": "deadbeef" }, {}),
+    provider.handleWebhook("{}", { "x-test-signature": "deadbeef" }),
     /Invalid test payment signature/
   )
 })
@@ -274,7 +270,7 @@ test("Test gateway: a missing signature is rejected", async () => {
   const { TestProvider } = await importTestProvider()
   const provider = new TestProvider()
 
-  await assert.rejects(provider.handleWebhook("{}", {}, {}), /Missing test payment signature/)
+  await assert.rejects(provider.handleWebhook("{}", {}), /Missing test payment signature/)
 })
 
 test("Test gateway: a failed payment is reported as not successful", async () => {
@@ -291,8 +287,7 @@ test("Test gateway: a failed payment is reported as not successful", async () =>
 
   const notification = await provider.handleWebhook(
     body,
-    { "x-test-signature": testSignature(body, "test-unit-secret") },
-    {}
+    { "x-test-signature": testSignature(body, "test-unit-secret") }
   )
 
   assert.equal(notification?.success, false)

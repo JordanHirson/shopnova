@@ -44,8 +44,7 @@ export class TestProvider implements PaymentProvider {
 
   async handleWebhook(
     body: string,
-    headers: Record<string, string>,
-    _query: Record<string, string>
+    headers: Record<string, string>
   ): Promise<PaymentNotification | null> {
     const signature = headers["x-test-signature"]
     if (!signature) throw new Error("Missing test payment signature.")

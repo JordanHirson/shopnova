@@ -378,7 +378,6 @@ async function upsertFederatedProduct(args: {
 async function uniqueSlug(storeId: string, baseSlug: string): Promise<string> {
   let slug = baseSlug
   let suffix = 1
-  // eslint-disable-next-line no-constant-condition
   while (true) {
     const conflict = await prisma.product.findFirst({
       where: { storeId, slug },

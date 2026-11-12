@@ -83,8 +83,7 @@ export class StripeProvider implements PaymentProvider {
 
   async handleWebhook(
     body: string,
-    headers: Record<string, string>,
-    _query: Record<string, string>
+    headers: Record<string, string>
   ): Promise<PaymentNotification | null> {
     if (!this.isConfigured()) {
       throw new Error("Stripe is not configured on the server.")
