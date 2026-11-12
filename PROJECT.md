@@ -5,8 +5,8 @@
 ```
 app/              # Next.js App Router pages and API routes
   (auth)/         # Clerk sign-in / sign-up routes
-  (dashboard)/    # Admin dashboard route group (own sidebar/topbar layout)
-  (marketing)/    # Storefront route group (storefront, cart, checkout, account)
+  (dashboard)/    # Admin dashboard route group (own sidebar/topbar layout; loading, error, not-found UI)
+  (marketing)/    # Storefront route group (storefront, cart, checkout, account; loading, error, not-found UI)
   api/            # API routes (webhooks, AI endpoints)
 components/       # Shared React components
   ui/             # shadcn/ui Base UI primitives (button, input, dialog, etc.)
