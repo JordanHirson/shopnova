@@ -307,6 +307,12 @@ model OrderItem {
   unitPrice  Decimal @db.Decimal(10, 2)
   totalPrice Decimal @db.Decimal(10, 2)
 
+  /** Snapshot of the product name at purchase time, so the line still shows
+   *  what was bought if the product is later renamed or deleted. */
+  productName     String   @db.VarChar(255)
+  /** Snapshot of the product's primary image URL at purchase time. */
+  productImageUrl String?  @db.VarChar(2048)
+
   orderId   String  @db.Uuid
   order     Order   @relation(fields: [orderId], references: [id], onDelete: Cascade)
   productId String  @db.Uuid

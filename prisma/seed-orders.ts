@@ -216,7 +216,13 @@ async function main() {
   // ── Products lookup by slug ──
   const products = await prisma.product.findMany({
     where: { storeId: store.id },
-    select: { id: true, slug: true, price: true },
+    select: {
+      id: true,
+      name: true,
+      slug: true,
+      price: true,
+      images: { orderBy: { sortOrder: "asc" }, take: 1 },
+    },
   })
   const productBySlug = new Map(products.map((p) => [p.slug, p]))
   if (productBySlug.size === 0) {
@@ -288,6 +294,8 @@ async function main() {
               quantity: plan.quantity,
               unitPrice,
               totalPrice: subtotal,
+              productName: product.name,
+              productImageUrl: product.images[0]?.url ?? null,
             },
           ],
         },

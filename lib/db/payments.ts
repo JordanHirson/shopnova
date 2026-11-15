@@ -277,7 +277,11 @@ export async function completePaidIntent(
         storeId: intent.storeId,
         archived: false,
       },
-      include: { inventory: true },
+      include: {
+        inventory: true,
+        // Only the primary image is needed for the purchase-time snapshot.
+        images: { orderBy: { sortOrder: "asc" }, take: 1 },
+      },
     })
     const productById = new Map(products.map((p) => [p.id, p]))
 
@@ -312,6 +316,10 @@ export async function completePaidIntent(
         quantity: item.quantity,
         unitPrice,
         totalPrice,
+        // Purchase-time snapshot so the order line keeps showing what was
+        // bought if the product is later renamed or deleted.
+        productName: product.name,
+        productImageUrl: product.images[0]?.url ?? null,
       }
     })
 
@@ -404,6 +412,8 @@ export async function completePaidIntent(
         quantity: item.quantity,
         unitPrice: item.unitPrice,
         totalPrice: item.totalPrice,
+        productName: item.productName,
+        productImageUrl: item.productImageUrl,
       })),
     })
 

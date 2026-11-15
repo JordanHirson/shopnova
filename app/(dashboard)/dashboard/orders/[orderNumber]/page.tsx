@@ -131,12 +131,21 @@ export default async function OrderDetailPage({ params }: OrderDetailPageProps) 
             <TableBody>
               {order.items.map((item) => (
                 <TableRow key={item.id}>
-                  <TableCell>
+                  <TableCell className="flex items-center gap-2">
+                    {item.productImageUrl && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={item.productImageUrl}
+                        alt={item.productName || item.product.name}
+                        className="h-8 w-8 rounded-md object-cover border border-border"
+                        decoding="async"
+                      />
+                    )}
                     <Link
                       href={`/products/${item.product.slug}`}
                       className="font-medium text-foreground hover:underline"
                     >
-                      {item.product.name}
+                      {item.productName || item.product.name}
                     </Link>
                     {item.product.archived ? (
                       <span className="ml-2 inline-flex items-center rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">

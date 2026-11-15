@@ -176,7 +176,7 @@ This requires `CLERK_SECRET_KEY` in your `.env.local`. You can also set it via t
 ### What's included
 
 - **Dashboard (`/dashboard`)** — KPI overview: products, categories, customers, orders, pending orders, low-stock count, and recent orders.
-- **Products (`/dashboard/products`)** — create, edit, archive (soft-delete), and restore products. Archiving hides a product from the storefront while keeping historical order records intact (`OrderItem` uses `onDelete: Restrict`).
+- **Products (`/dashboard/products`)** — create, edit, archive (soft-delete), and restore products. Archiving hides a product from the storefront while keeping historical order records intact (`OrderItem` uses `onDelete: Restrict`). Order lines snapshot the product name and primary image URL at purchase time (`OrderItem.productName`, `productImageUrl`), so completed orders keep showing what was bought even if a product is later renamed or archived.
 - **Categories (`/dashboard/categories`)** — create, edit, and delete categories. Deletion is blocked with a clear error when products still reference the category.
 - **Inventory (`/dashboard/inventory`)** — view stock levels and low-stock thresholds, update quantities and thresholds.
 - **Orders (`/dashboard/orders`, `/dashboard/orders/[orderNumber]`)** — view orders and order details, update fulfillment status. Payment status is read-only and stays webhook-driven — an admin UI action can never mark an order paid or refunded.
