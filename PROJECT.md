@@ -297,3 +297,45 @@ The main seed (`prisma/seed.ts`) creates the store, categories, products, and in
 | `npx prisma migrate deploy` | Apply pending migrations (production) |
 | `npx tsc --noEmit` | Type-check the project without emitting files |
 | `npx next build` | Production build (equivalent to `npm run build`) |
+
+## Deployment
+
+ShopNova is deployed on [Vercel](https://vercel.com) connected to the `JordanHirson/shopnova` GitHub repository.
+
+### Deployment target
+
+- **Host:** Vercel (Next.js framework preset)
+- **Build command:** `npm run build`
+- **Install command:** `npm install`
+- **Preview deployments:** Enabled automatically for every pull request (no extra configuration)
+
+### Environment variables
+
+Every variable from `.env.example` is set in Vercel project settings → Environment Variables. Required at minimum:
+
+| Variable | Source |
+|----------|--------|
+| `DATABASE_URL` | Hosted PostgreSQL (Neon / Supabase) |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Clerk development instance |
+| `CLERK_SECRET_KEY` | Clerk development instance |
+| `UPSTASH_REDIS_REST_URL` + `UPSTASH_REDIS_REST_TOKEN` | Upstash Redis (production cart) |
+
+Optional (set only when using the corresponding gateway): `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `PAYFAST_MERCHANT_ID`, `PAYFAST_MERCHANT_KEY`, `PAYFAST_PASSPHRASE`, `PAYFAST_TEST_MODE`, `TEST_DATABASE_URL`, `TEST_PAYMENT_SECRET`, `BOBGO_API_KEY`, `YOCO_*`, `STITCH_*`, `OPENAI_API_KEY`/`AI_API_KEY`, `SHIPPING_ORIGIN_*`, `ARAMEX_*`.
+
+### Clerk instance
+
+ShopNova uses the existing Clerk **development** instance (test keys `sk_test_...` / `pk_test_...`), not a separate production Clerk instance. This is documented in `README.md`.
+
+### Webhook URLs (registered after first deploy)
+
+Once the public Vercel URL is known (`https://<project>.vercel.app`):
+
+- **Stripe (test mode):** `https://<project>.vercel.app/api/webhooks/stripe` — events: `checkout.session.completed`
+- **PayFast Sandbox:** `https://<project>.vercel.app/api/webhooks/payfast` — ITN/notification URL
+
+### Public URL
+
+**Storefront:** `https://<project>.vercel.app`
+**Admin:** `https://<project>.vercel.app/dashboard`
+
+*(Replace `<project>` with the actual Vercel project name once deployed.)*

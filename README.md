@@ -282,6 +282,81 @@ npx prisma generate         # Generate the Prisma Client
 npm run db:seed             # Seed demo data
 ```
 
+## Deployment to Vercel
+
+ShopNova is deployed on [Vercel](https://vercel.com). The storefront and admin are available at a public URL, and every pull request gets its own preview deployment.
+
+### 1. Connect the GitHub repository
+
+1. Log in to [Vercel](https://vercel.com).
+2. Click **Add New Project → Import** and select `JordanHirson/shopnova`.
+3. Framework preset: **Next.js**. Build command: `npm run build`. Install command: `npm install`.
+4. Click **Deploy**.
+
+### 2. Set environment variables
+
+In the Vercel project dashboard, go to **Settings → Environment Variables** and add every variable from [`.env.example`](.env.example):
+
+| Variable | Required? | Source |
+|----------|-----------|--------|
+| `DATABASE_URL` | Yes | Hosted PostgreSQL (Neon / Supabase) |
+| `TEST_DATABASE_URL` | No | Separate test database (never production) |
+| `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` | Yes | Clerk development instance |
+| `CLERK_SECRET_KEY` | Yes | Clerk development instance |
+| `STRIPE_SECRET_KEY` | No (for Stripe payments) | Stripe Dashboard → Test mode |
+| `STRIPE_WEBHOOK_SECRET` | No (for Stripe payments) | Stripe webhook endpoint (see below) |
+| `PAYFAST_MERCHANT_ID` | No (for PayFast) | PayFast Sandbox |
+| `PAYFAST_MERCHANT_KEY` | No (for PayFast) | PayFast Sandbox |
+| `PAYFAST_PASSPHRASE` | No (for PayFast) | PayFast Sandbox |
+| `PAYFAST_TEST_MODE` | No | Set to `"true"` |
+| `UPSTASH_REDIS_REST_URL` | Yes (production cart) | Upstash Redis |
+| `UPSTASH_REDIS_REST_TOKEN` | Yes (production cart) | Upstash Redis |
+| All others | Optional | See `.env.example` |
+
+> **Clerk instance:** ShopNova uses the existing Clerk **development** instance (test keys `sk_test_...` / `pk_test_...`), not a separate production Clerk instance. Authentication runs against Clerk dev for both the storefront and admin.
+
+### 3. Database setup
+
+After the first deploy, run against the production `DATABASE_URL`:
+
+```bash
+npx prisma migrate deploy
+npx prisma generate
+npm run db:seed
+npm run db:seed-orders   # optional demo customers + orders
+```
+
+Then grant admin access to your Clerk user:
+
+```bash
+npm run set-admin -- <clerkUserId>
+```
+
+### 4. Register live webhook URLs
+
+Once you have your public Vercel URL (`https://<project>.vercel.app`):
+
+**Stripe (test mode):**
+- Stripe Dashboard → Developers → Webhooks → Add endpoint
+- URL: `https://<project>.vercel.app/api/webhooks/stripe`
+- Events: `checkout.session.completed`
+- Copy the `whsec_...` signing secret into Vercel as `STRIPE_WEBHOOK_SECRET`
+
+**PayFast Sandbox:**
+- PayFast Merchant Profile → ITN / notification URL
+- URL: `https://<project>.vercel.app/api/webhooks/payfast`
+
+### 5. Preview deployments
+
+Vercel automatically creates a preview deployment for every pull request. No additional configuration is required.
+
+### Public URL
+
+**Storefront:** `https://<project>.vercel.app`
+**Admin:** `https://<project>.vercel.app/dashboard`
+
+*(Replace `<project>` with your actual Vercel project name once deployed.)*
+
 > Existing local database from before the migration baseline? Run
 > `npx prisma migrate resolve --applied 20260901000000_init` once to mark it
 > as migrated, then use `npx prisma migrate dev` for any further schema changes.
