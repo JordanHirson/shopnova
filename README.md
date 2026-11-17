@@ -24,7 +24,8 @@ ShopNova is a modern e-commerce platform built with Next.js (App Router), TypeSc
 
 2. Create a `.env.local` from `.env.example` and configure the required environment variables:
 
-   - `DATABASE_URL` — PostgreSQL connection string (e.g. `postgresql://USER:PASSWORD@HOST:PORT/DATABASE?schema=public`)
+   - `DATABASE_URL` — PostgreSQL connection string to the **production** hosted database (e.g. `postgresql://USER:PASSWORD@HOST:PORT/DATABASE?sslmode=require`). Get it from Neon or Supabase. Production data lives only in this hosted database; the connection string exists ONLY in environment variables — never commit it.
+   - `TEST_DATABASE_URL` — connection string to a **separate** database (Neon branch or separate Supabase project) used for tests. Never point this at the production database.
    - `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` — from your Clerk application
    - `CLERK_SECRET_KEY` — from your Clerk application (also used by `npm run set-admin`)
 
@@ -78,6 +79,33 @@ ShopNova is a modern e-commerce platform built with Next.js (App Router), TypeSc
    ```
 
    Open [http://localhost:3000](http://localhost:3000).
+
+## Hosted Database (Production & Tests)
+
+ShopNova uses a hosted PostgreSQL database for production data (Neon or Supabase free tier). The connection string lives **only** in environment variables — never committed to git.
+
+1. **Production database.** Create a project in Neon (or Supabase). Copy its **direct** connection string (port 5432, `?sslmode=require` — Prisma migrations need a direct TCP connection, not the pooled/HTTP endpoint) into `DATABASE_URL` in your `.env.local` (local dev) and in your production host's environment variables (e.g. Vercel project settings → Environment Variables). Do not commit `.env.local` (it is gitignored).
+
+2. **Test database.** Create a **separate** database — a Neon branch named `test`, or a separate free Supabase project. Copy its connection string into `TEST_DATABASE_URL`. Never point `TEST_DATABASE_URL` at the production database.
+
+3. **Apply migrations + seed (production).**
+   ```bash
+   npx prisma migrate deploy   # Applies prisma/migrations to the hosted production DB
+   npx prisma generate         # Generate the Prisma Client
+   npm run db:seed             # Seed demo store, categories, products, inventory
+   npm run db:seed-orders      # Optional: demo customers + orders
+   ```
+
+4. **Apply migrations + seed (tests).** Point `DATABASE_URL` at the test database, then run the same commands. On Windows PowerShell:
+   ```powershell
+   $env:DATABASE_URL=$env:TEST_DATABASE_URL
+   npx prisma migrate deploy
+   npx prisma generate
+   npm run db:seed
+   ```
+   Or Bash: `DATABASE_URL="$TEST_DATABASE_URL" npx prisma migrate deploy && npx prisma generate && npm run db:seed`
+
+   The existing unit tests (`npm test`) are pure logic tests with fakes — they do **not** touch a live database, so they need no `DATABASE_URL`.
 
 ## Tests
 

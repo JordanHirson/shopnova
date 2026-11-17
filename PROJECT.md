@@ -41,7 +41,8 @@ scripts/          # Utility scripts (set-admin, test loader)
 - **React + TypeScript** throughout.
 - **shadcn/ui Base UI** for component primitives. Custom components built on top.
 - **Prisma 7** for type-safe database access. Schema in `prisma/schema.prisma`.
-- **PostgreSQL** as the database. (pgvector is not used by the MVP; it is a post-MVP roadmap item.)
+- **PostgreSQL** as the database, hosted on Neon (or Supabase free tier) for production. (pgvector is not used by the MVP; it is a post-MVP roadmap item.)
+- **Database connection strings:** `DATABASE_URL` (production) and `TEST_DATABASE_URL` (separate test database/branch). Both exist **only** in environment variables — never committed to git. Production and test databases are kept strictly separate; `TEST_DATABASE_URL` must never point at the production database.
 - **Clerk** for authentication.
 - **React Hook Form + Zod** for form validation. No Formik.
 - **TanStack Query** is installed but not currently used in the application.
