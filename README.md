@@ -334,17 +334,17 @@ npm run set-admin -- <clerkUserId>
 
 ### 4. Register live webhook URLs
 
-Once you have your public Vercel URL (`https://<project>.vercel.app`):
+Public URL: **https://shopnova-rust.vercel.app**
 
 **Stripe (test mode):**
 - Stripe Dashboard → Developers → Webhooks → Add endpoint
-- URL: `https://<project>.vercel.app/api/webhooks/stripe`
+- URL: `https://shopnova-rust.vercel.app/api/webhooks/stripe`
 - Events: `checkout.session.completed`
 - Copy the `whsec_...` signing secret into Vercel as `STRIPE_WEBHOOK_SECRET`
 
 **PayFast Sandbox:**
 - PayFast Merchant Profile → ITN / notification URL
-- URL: `https://<project>.vercel.app/api/webhooks/payfast`
+- URL: `https://shopnova-rust.vercel.app/api/webhooks/payfast`
 
 ### 5. Preview deployments
 
@@ -352,10 +352,8 @@ Vercel automatically creates a preview deployment for every pull request. No add
 
 ### Public URL
 
-**Storefront:** `https://<project>.vercel.app`
-**Admin:** `https://<project>.vercel.app/dashboard`
-
-*(Replace `<project>` with your actual Vercel project name once deployed.)*
+**Storefront:** https://shopnova-rust.vercel.app
+**Admin:** https://shopnova-rust.vercel.app/dashboard
 
 > Existing local database from before the migration baseline? Run
 > `npx prisma migrate resolve --applied 20260901000000_init` once to mark it

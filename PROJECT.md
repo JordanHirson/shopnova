@@ -328,14 +328,12 @@ ShopNova uses the existing Clerk **development** instance (test keys `sk_test_..
 
 ### Webhook URLs (registered after first deploy)
 
-Once the public Vercel URL is known (`https://<project>.vercel.app`):
+Once the public Vercel URL is known (`https://shopnova-rust.vercel.app`):
 
-- **Stripe (test mode):** `https://<project>.vercel.app/api/webhooks/stripe` — events: `checkout.session.completed`
-- **PayFast Sandbox:** `https://<project>.vercel.app/api/webhooks/payfast` — ITN/notification URL
+- **Stripe (test mode):** `https://shopnova-rust.vercel.app/api/webhooks/stripe` — events: `checkout.session.completed`
+- **PayFast Sandbox:** `https://shopnova-rust.vercel.app/api/webhooks/payfast` — ITN/notification URL
 
 ### Public URL
 
-**Storefront:** `https://<project>.vercel.app`
-**Admin:** `https://<project>.vercel.app/dashboard`
-
-*(Replace `<project>` with the actual Vercel project name once deployed.)*
+**Storefront:** https://shopnova-rust.vercel.app
+**Admin:** https://shopnova-rust.vercel.app/dashboard
