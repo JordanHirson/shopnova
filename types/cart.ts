@@ -34,4 +34,7 @@ export interface Cart {
 export interface CartActionResult {
   cart: Cart
   error?: string
+  /** Shopper identity used for this cart. Returned so the client can
+   * persist it as a cookie when the server-side cookie set fails. */
+  shopperId?: string
 }

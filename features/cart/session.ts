@@ -42,7 +42,6 @@ export async function getShopperId(): Promise<string> {
   const id = randomUUID()
   const cookieStore = await cookies()
   cookieStore.set(ANON_COOKIE_NAME, id, {
-    httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",
     maxAge: ANON_COOKIE_MAX_AGE,

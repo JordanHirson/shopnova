@@ -34,6 +34,19 @@ async function loadCart(shopperId: string): Promise<Cart> {
   return existing ?? createEmptyCart()
 }
 
+/**
+ * Returns the current cart, or an empty cart when the cart store is
+ * unavailable. Used for defensive read paths where a thrown store error
+ * should degrade gracefully instead of surfacing the error boundary.
+ */
+async function getCartOrEmpty(): Promise<Cart> {
+  try {
+    return await getCartAction()
+  } catch {
+    return createEmptyCart()
+  }
+}
+
 /** Returns the current cart for the active shopper. */
 export async function getCartAction(): Promise<Cart> {
   const shopperId = await getShopperId()
@@ -56,16 +69,40 @@ export async function addToCartAction(
   quantity: number
 ): Promise<CartActionResult> {
   if (!productId) {
-    return { cart: await getCartAction(), error: "Product is required." }
+    return { cart: await getCartOrEmpty(), error: "Product is required.", shopperId: undefined }
   }
 
   const product = await getCartProduct(productId)
   if (!product) {
-    return { cart: await getCartAction(), error: "Product not found." }
+    return { cart: await getCartOrEmpty(), error: "Product not found.", shopperId: undefined }
   }
 
-  const shopperId = await getShopperId()
-  const cart = await loadCart(shopperId)
+  let shopperId: string | undefined = undefined
+  try {
+    shopperId = await getShopperId()
+  } catch (err) {
+    return {
+      cart: await getCartOrEmpty(),
+      error:
+        err instanceof Error ? err.message : "Failed to identify shopper.",
+      shopperId,
+    }
+  }
+
+  if (!shopperId) {
+    return { cart: createEmptyCart(), error: "Failed to identify shopper.", shopperId: undefined }
+  }
+
+  let cart: Cart
+  try {
+    cart = await loadCart(shopperId)
+  } catch (err) {
+    return {
+      cart: createEmptyCart(),
+      error: err instanceof Error ? err.message : "Failed to load the cart.",
+      shopperId,
+    }
+  }
 
   const result = addItemToCart(
     cart,
@@ -81,10 +118,21 @@ export async function addToCartAction(
     product.quantityAvailable
   )
 
-  await cartStore.saveCart(shopperId, result.cart)
-  revalidatePath("/", "layout")
+  try {
+    await cartStore.saveCart(shopperId, result.cart)
+    revalidatePath("/", "layout")
+  } catch (err) {
+    return {
+      cart: result.cart,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Failed to save the cart. Please try again.",
+      shopperId,
+    }
+  }
 
-  return { cart: result.cart, error: result.error }
+  return { cart: result.cart, error: result.error, shopperId }
 }
 
 /** Sets the exact quantity of a cart line. */
@@ -93,16 +141,40 @@ export async function updateCartItemQuantityAction(
   quantity: number
 ): Promise<CartActionResult> {
   if (!productId) {
-    return { cart: await getCartAction(), error: "Product is required." }
+    return { cart: await getCartOrEmpty(), error: "Product is required.", shopperId: undefined }
   }
 
   const product = await getCartProduct(productId)
   if (!product) {
-    return { cart: await getCartAction(), error: "Product not found." }
+    return { cart: await getCartOrEmpty(), error: "Product not found.", shopperId: undefined }
   }
 
-  const shopperId = await getShopperId()
-  const cart = await loadCart(shopperId)
+  let shopperId: string | undefined = undefined
+  try {
+    shopperId = await getShopperId()
+  } catch (err) {
+    return {
+      cart: await getCartOrEmpty(),
+      error:
+        err instanceof Error ? err.message : "Failed to identify shopper.",
+      shopperId,
+    }
+  }
+
+  if (!shopperId) {
+    return { cart: createEmptyCart(), error: "Failed to identify shopper.", shopperId: undefined }
+  }
+
+  let cart: Cart
+  try {
+    cart = await loadCart(shopperId)
+  } catch (err) {
+    return {
+      cart: createEmptyCart(),
+      error: err instanceof Error ? err.message : "Failed to load the cart.",
+      shopperId,
+    }
+  }
 
   const result = updateCartItemQuantity(
     cart,
@@ -111,10 +183,21 @@ export async function updateCartItemQuantityAction(
     product.quantityAvailable
   )
 
-  await cartStore.saveCart(shopperId, result.cart)
-  revalidatePath("/", "layout")
+  try {
+    await cartStore.saveCart(shopperId, result.cart)
+    revalidatePath("/", "layout")
+  } catch (err) {
+    return {
+      cart: result.cart,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Failed to save the cart. Please try again.",
+      shopperId,
+    }
+  }
 
-  return { cart: result.cart, error: result.error }
+  return { cart: result.cart, error: result.error, shopperId }
 }
 
 /** Removes a single line from the cart. */
@@ -122,25 +205,88 @@ export async function removeCartItemAction(
   productId: string
 ): Promise<CartActionResult> {
   if (!productId) {
-    return { cart: await getCartAction(), error: "Product is required." }
+    return { cart: await getCartOrEmpty(), error: "Product is required.", shopperId: undefined }
   }
 
-  const shopperId = await getShopperId()
-  const cart = await loadCart(shopperId)
+  let shopperId: string | undefined = undefined
+  try {
+    shopperId = await getShopperId()
+  } catch (err) {
+    return {
+      cart: await getCartOrEmpty(),
+      error:
+        err instanceof Error ? err.message : "Failed to identify shopper.",
+      shopperId,
+    }
+  }
+
+  if (!shopperId) {
+    return { cart: createEmptyCart(), error: "Failed to identify shopper.", shopperId: undefined }
+  }
+
+  let cart: Cart
+  try {
+    cart = await loadCart(shopperId)
+  } catch (err) {
+    return {
+      cart: createEmptyCart(),
+      error: err instanceof Error ? err.message : "Failed to load the cart.",
+      shopperId,
+    }
+  }
 
   const updated = removeCartItem(cart, productId)
-  await cartStore.saveCart(shopperId, updated)
-  revalidatePath("/", "layout")
 
-  return { cart: updated }
+  try {
+    await cartStore.saveCart(shopperId, updated)
+    revalidatePath("/", "layout")
+  } catch (err) {
+    return {
+      cart: updated,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Failed to save the cart. Please try again.",
+      shopperId,
+    }
+  }
+
+  return { cart: updated, shopperId }
 }
 
 /** Clears the entire cart. */
 export async function clearCartAction(): Promise<CartActionResult> {
-  const shopperId = await getShopperId()
-  const empty = clearCartLogic()
-  await cartStore.saveCart(shopperId, empty)
-  revalidatePath("/", "layout")
+  let shopperId: string | undefined = undefined
+  try {
+    shopperId = await getShopperId()
+  } catch (err) {
+    return {
+      cart: await getCartOrEmpty(),
+      error:
+        err instanceof Error ? err.message : "Failed to identify shopper.",
+      shopperId,
+    }
+  }
 
-  return { cart: empty }
+  if (!shopperId) {
+    return { cart: createEmptyCart(), error: "Failed to identify shopper.", shopperId: undefined }
+  }
+
+  const empty = clearCartLogic()
+
+  try {
+    await cartStore.saveCart(shopperId, empty)
+    revalidatePath("/", "layout")
+  } catch (err) {
+    return {
+      cart: empty,
+      error:
+        err instanceof Error
+          ? err.message
+          : "Failed to save the cart. Please try again.",
+      shopperId,
+    }
+  }
+
+  return { cart: empty, shopperId }
 }

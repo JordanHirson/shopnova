@@ -46,6 +46,10 @@ export function AddToCartButton({
       }
 
       setMessage("Added to cart.")
+      if (result.shopperId) {
+        const uuid = result.shopperId.split(":")[1]
+        document.cookie = `shopnova_cart_id=${uuid}; path=/; max-age=${60 * 60 * 24 * 30}; sameSite=lax${process.env.NODE_ENV === "production" ? "; secure" : ""}`
+      }
       await refresh()
     })
   }
